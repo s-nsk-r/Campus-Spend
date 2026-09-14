@@ -23,16 +23,25 @@ const CATEGORY_COLORS = {
     "Others":             { bg: "#9ca3af", class: "seg-gray",   badge: "b-others",     label: "Others"              }
 };
 
-// Category budget suggestions (for budget view)
-const CATEGORY_BUDGETS = {
-    "Food & Dining":      5000,
-    "Academics & Books":  4000,
-    "Transportation":     2000,
-    "Hostel & Utilities": 2500,
-    "Entertainment":      1000,
-    "Healthcare":          500,
-    "Others":             1000
+// Category budget weights for dynamic allocation based on monthly budget limit
+const CATEGORY_WEIGHTS = {
+    "Food & Dining":      5.0,   // ~31%
+    "Academics & Books":  4.0,   // ~25%
+    "Hostel & Utilities": 2.5,   // ~16%
+    "Transportation":     2.0,   // ~12.5%
+    "Entertainment":      1.0,   // ~6%
+    "Others":             1.0,   // ~6%
+    "Healthcare":         0.5    // ~3%
 };
+
+function getCategoryBudgetLimit(cat) {
+    const weights = CATEGORY_WEIGHTS;
+    const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+    const weight = weights[cat] || 1.0;
+    // Scale proportionally with monthlyBudgetLimit, rounded to nearest 50 for clean display
+    const calculated = Math.round((monthlyBudgetLimit * (weight / totalWeight)) / 50) * 50;
+    return Math.max(100, calculated);
+}
 
 // =========================================================
 // Initialization
@@ -119,7 +128,8 @@ function switchView(viewName, navEl) {
     if (container) container.scrollTop = 0;
     window.scrollTo({ top: 0, behavior: "instant" });
 
-    // Sync analytics / budget views on switch
+    // Sync analytics / budget / dashboard views on switch
+    if (viewName === "dashboard") renderBentoChart(allExpensesCache);
     if (viewName === "analytics") renderAnalyticsView(allExpensesCache);
     if (viewName === "budget")    renderBudgetView(allExpensesCache);
 
@@ -335,8 +345,9 @@ async function fetchSummaryStats() {
         // Cost analysis
         renderCostAnalysis(stats.category_breakdown || {}, totalSpent);
 
-        // Health gauge
-        renderHealthGauge(savedPct);
+        // Health gauge: shows how much budget is used
+        const actualSpentPct = monthlyBudgetLimit > 0 ? Math.round((totalSpent / monthlyBudgetLimit) * 100) : 0;
+        renderHealthGauge(actualSpentPct);
 
         // Goals
         renderGoals(stats.category_breakdown || {});
@@ -383,20 +394,23 @@ function renderCostAnalysis(breakdown, totalSpent) {
 
     const entries = Object.entries(breakdown);
     if (entries.length === 0 || totalSpent === 0) {
-        barEl.innerHTML  = `<div class="seg-item seg-gray" style="width:100%;"></div>`;
+        barEl.innerHTML  = `<div class="seg-item" style="width:100%;background:#9ca3af;"></div>`;
         listEl.innerHTML = `<div class="cat-list-empty">No expenses recorded yet</div>`;
         return;
     }
 
     entries.sort((a, b) => b[1] - a[1]);
     entries.forEach(([cat, amt]) => {
-        const pct     = Math.round((amt / totalSpent) * 100);
+        const pctRaw  = (amt / totalSpent) * 100;
+        const pct     = Math.round(pctRaw);
         const catInfo = CATEGORY_COLORS[cat] || CATEGORY_COLORS["Others"];
 
+        // Fill edge-to-edge with explicit flex basis and color
         const seg = document.createElement("div");
-        seg.className   = `seg-item ${catInfo.class}`;
-        seg.style.width = `${pct}%`;
-        seg.title       = `${cat}: Rs.${amt.toLocaleString("en-IN")} (${pct}%)`;
+        seg.className             = `seg-item ${catInfo.class}`;
+        seg.style.flex            = `${amt} 1 0px`;
+        seg.style.backgroundColor = catInfo.bg;
+        seg.title                 = `${cat}: Rs.${amt.toLocaleString("en-IN")} (${pct}%)`;
         barEl.appendChild(seg);
 
         const row = document.createElement("div");
@@ -412,46 +426,54 @@ function renderCostAnalysis(breakdown, totalSpent) {
     });
 }
 
-function renderHealthGauge(savedPct) {
+function renderHealthGauge(spentPct) {
     const scoreDisplay = document.getElementById("healthScoreDisplay");
     const pctText      = document.getElementById("gaugePercentText");
     const arc          = document.getElementById("gaugeArc");
 
-    if (pctText) pctText.innerText = `${savedPct}%`;
+    if (pctText) {
+        pctText.innerText   = `${spentPct}%`;
+        pctText.style.color = spentPct >= 100 ? "var(--danger)" : "var(--text-main)";
+    }
 
     if (scoreDisplay) {
-        if (savedPct >= 60) {
-            scoreDisplay.innerText  = "Optimal";
+        if (spentPct < 70) {
+            scoreDisplay.innerText   = "Optimal";
             scoreDisplay.style.color = "var(--accent-lime-dark)";
-        } else if (savedPct >= 30) {
-            scoreDisplay.innerText  = "Moderate";
+        } else if (spentPct < 100) {
+            scoreDisplay.innerText   = "Moderate";
             scoreDisplay.style.color = "var(--color-yellow)";
         } else {
-            scoreDisplay.innerText  = "Warning";
+            scoreDisplay.innerText   = "Warning";
             scoreDisplay.style.color = "var(--danger)";
         }
     }
 
     if (arc) {
         const maxOffset = 141.37;
-        const progress  = Math.max(0, Math.min(100, savedPct)) / 100;
-        arc.style.strokeDashoffset = maxOffset * (1 - progress);
+        const progress  = Math.max(0, Math.min(100, spentPct)) / 100;
+        arc.style.strokeDashoffset = `${maxOffset * (1 - progress)}`;
+        arc.style.stroke           = spentPct >= 100 ? "var(--danger)" : "var(--accent-lime)";
     }
 }
 
 function renderGoals(breakdown) {
+    const academicLimit  = getCategoryBudgetLimit("Academics & Books");
+    const foodLimit      = getCategoryBudgetLimit("Food & Dining");
+    const transportLimit = getCategoryBudgetLimit("Transportation");
+
     const academic  = breakdown["Academics & Books"] || 0;
     const food      = breakdown["Food & Dining"]     || 0;
     const transport = breakdown["Transportation"]    || 0;
 
-    setInner("goalAcademicAmount",  `Rs.${academic.toLocaleString("en-IN")} / Rs.4,000`);
-    setStyle("goalAcademicProg",    "width", `${Math.min(100, (academic  / 4000) * 100)}%`);
+    setInner("goalAcademicAmount",  `Rs.${academic.toLocaleString("en-IN")} / Rs.${academicLimit.toLocaleString("en-IN")}`);
+    setStyle("goalAcademicProg",    "width", `${Math.min(100, (academic  / academicLimit) * 100)}%`);
 
-    setInner("goalFoodAmount",      `Rs.${food.toLocaleString("en-IN")} / Rs.5,000`);
-    setStyle("goalFoodProg",        "width", `${Math.min(100, (food      / 5000) * 100)}%`);
+    setInner("goalFoodAmount",      `Rs.${food.toLocaleString("en-IN")} / Rs.${foodLimit.toLocaleString("en-IN")}`);
+    setStyle("goalFoodProg",        "width", `${Math.min(100, (food      / foodLimit) * 100)}%`);
 
-    setInner("goalTransportAmount", `Rs.${transport.toLocaleString("en-IN")} / Rs.2,000`);
-    setStyle("goalTransportProg",   "width", `${Math.min(100, (transport / 2000) * 100)}%`);
+    setInner("goalTransportAmount", `Rs.${transport.toLocaleString("en-IN")} / Rs.${transportLimit.toLocaleString("en-IN")}`);
+    setStyle("goalTransportProg",   "width", `${Math.min(100, (transport / transportLimit) * 100)}%`);
 }
 
 function editBudgetLimit() {
@@ -462,7 +484,10 @@ function editBudgetLimit() {
             monthlyBudgetLimit = val;
             localStorage.setItem("camp_budget_limit", val);
             fetchSummaryStats();
-            showToast(`Budget updated to Rs.${val.toLocaleString("en-IN")}`, "success");
+            if (allExpensesCache && allExpensesCache.length >= 0) {
+                renderBudgetView(allExpensesCache);
+            }
+            showToast(`Budget ceiling updated to Rs.${val.toLocaleString("en-IN")}`, "success");
         }
     }
 }
@@ -586,7 +611,7 @@ function renderBudgetView(expenses) {
 
     listEl.innerHTML = "";
 
-    const allCats = Object.keys(CATEGORY_BUDGETS);
+    const allCats = Object.keys(CATEGORY_WEIGHTS);
     if (Object.keys(breakdown).length === 0) {
         listEl.innerHTML = `<div class="cat-list-empty">No expenses recorded yet</div>`;
         return;
@@ -594,7 +619,7 @@ function renderBudgetView(expenses) {
 
     allCats.forEach(cat => {
         const spent   = breakdown[cat] || 0;
-        const limit   = CATEGORY_BUDGETS[cat];
+        const limit   = getCategoryBudgetLimit(cat);
         const pct     = Math.min(100, Math.round((spent / limit) * 100));
         const catInfo = CATEGORY_COLORS[cat] || CATEGORY_COLORS["Others"];
         const over    = spent > limit;
@@ -622,49 +647,139 @@ function renderBudgetView(expenses) {
 }
 
 // =========================================================
+// Custom Chart.js plugin to draw a single 1px hairline divider ONLY between adjacent stacked categories
+// (zero lines at the baseline/bottom, zero lines at the peak/top, zero lines on sides)
+const categoryDividersPlugin = {
+    id: 'categoryDividers',
+    afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        const dividerColor = isDark ? "#111114" : "#ffffff";
+
+        ctx.save();
+        ctx.strokeStyle = dividerColor;
+        ctx.lineWidth = 1;
+
+        const numDatasets = data.datasets.length;
+        const numDays = data.labels.length;
+
+        for (let dayIdx = 0; dayIdx < numDays; dayIdx++) {
+            const activeElements = [];
+            for (let dsIdx = 0; dsIdx < numDatasets; dsIdx++) {
+                const meta = chart.getDatasetMeta(dsIdx);
+                if (meta.hidden) continue;
+                const el = meta.data[dayIdx];
+                if (el && Math.abs(el.base - el.y) > 0.5) {
+                    activeElements.push(el);
+                }
+            }
+
+            if (activeElements.length <= 1) continue;
+
+            // Sort from bottom to top (in canvas coords, larger y is lower on screen)
+            activeElements.sort((a, b) => b.y - a.y);
+
+            // Draw a single 1px hairline divider only between stacked categories
+            // Never at the baseline (bottom), and never at the top of the entire bar
+            for (let i = 0; i < activeElements.length - 1; i++) {
+                const el = activeElements[i];
+                const y = Math.round(el.y) + 0.5;
+                const halfWidth = el.width / 2;
+                const x1 = Math.round(el.x - halfWidth);
+                const x2 = Math.round(el.x + halfWidth);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y);
+                ctx.lineTo(x2, y);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+};
+
+// =========================================================
 // Stacked Bar Chart (Dashboard Hero)
 // =========================================================
 function renderBentoChart(expenses) {
     const canvas = document.getElementById("bentoBarChart");
     if (!canvas) return;
 
-    const days           = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const dailyAcademics = [0, 0, 0, 0, 0, 0, 0];
-    const dailyFood      = [0, 0, 0, 0, 0, 0, 0];
-    const dailyOther     = [0, 0, 0, 0, 0, 0, 0];
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dailyData = {
+        "Food & Dining":      [0, 0, 0, 0, 0, 0, 0],
+        "Academics & Books":  [0, 0, 0, 0, 0, 0, 0],
+        "Transportation":     [0, 0, 0, 0, 0, 0, 0],
+        "Hostel & Utilities": [0, 0, 0, 0, 0, 0, 0],
+        "Entertainment":      [0, 0, 0, 0, 0, 0, 0],
+        "Healthcare":         [0, 0, 0, 0, 0, 0, 0],
+        "Others":             [0, 0, 0, 0, 0, 0, 0]
+    };
 
-    expenses.forEach(exp => {
+    (expenses || []).forEach(exp => {
         if (!exp.expense_date) return;
-        const d      = new Date(exp.expense_date + "T00:00:00");
-        const dayIdx = d.getDay();
-        if      (exp.category === "Academics & Books") dailyAcademics[dayIdx] += exp.amount;
-        else if (exp.category === "Food & Dining")     dailyFood[dayIdx]      += exp.amount;
-        else                                            dailyOther[dayIdx]     += exp.amount;
+        const dateStr = (exp.expense_date || "").split("T")[0];
+        const d       = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
+        const dayIdx  = isNaN(d.getDay()) ? 0 : d.getDay();
+
+        const cat = exp.category || "Others";
+        if (dailyData[cat]) {
+            dailyData[cat][dayIdx] += exp.amount;
+        } else {
+            dailyData["Others"][dayIdx] += exp.amount;
+        }
     });
 
     const isDark     = document.documentElement.getAttribute("data-theme") === "dark";
     const gridColor  = isDark ? "#232328" : "#f0f2f5";
     const labelColor = isDark ? "#6b7280" : "#9ca3af";
 
-    if (bentoChartInstance) { bentoChartInstance.destroy(); bentoChartInstance = null; }
+    const datasets = [
+        { label: "Food & Dining",      data: dailyData["Food & Dining"],      backgroundColor: "#fb923c",                      borderWidth: 0, borderRadius: 0, barPercentage: 0.55 },
+        { label: "Academics & Books",  data: dailyData["Academics & Books"],  backgroundColor: isDark ? "#bef264" : "#a3e635", borderWidth: 0, borderRadius: 0, barPercentage: 0.55 },
+        { label: "Transportation",     data: dailyData["Transportation"],     backgroundColor: "#38bdf8",                      borderWidth: 0, borderRadius: 0, barPercentage: 0.55 },
+        { label: "Hostel & Utilities", data: dailyData["Hostel & Utilities"], backgroundColor: "#c084fc",                      borderWidth: 0, borderRadius: 0, barPercentage: 0.55 },
+        { label: "Entertainment",      data: dailyData["Entertainment"],      backgroundColor: "#f472b6",                      borderWidth: 0, borderRadius: 0, barPercentage: 0.55 },
+        { label: "Healthcare",         data: dailyData["Healthcare"],         backgroundColor: "#34d399",                      borderWidth: 0, borderRadius: 0, barPercentage: 0.55 },
+        { label: "Others",             data: dailyData["Others"],             backgroundColor: "#9ca3af",                      borderWidth: 0, borderRadius: 0, barPercentage: 0.55 }
+    ];
+
+    // If chart already exists with same number of datasets, update data smoothly in-place with animation
+    if (bentoChartInstance && bentoChartInstance.data.datasets.length === datasets.length) {
+        datasets.forEach((ds, idx) => {
+            bentoChartInstance.data.datasets[idx].data = ds.data;
+            bentoChartInstance.data.datasets[idx].backgroundColor = ds.backgroundColor;
+            bentoChartInstance.data.datasets[idx].borderWidth = 0;
+            bentoChartInstance.data.datasets[idx].borderRadius = 0;
+        });
+        bentoChartInstance.options.scales.x.ticks.color = labelColor;
+        bentoChartInstance.options.scales.y.ticks.color = labelColor;
+        bentoChartInstance.options.scales.y.grid.color = gridColor;
+        bentoChartInstance.update();
+        return;
+    }
+
+    if (bentoChartInstance) {
+        bentoChartInstance.destroy();
+        bentoChartInstance = null;
+    }
 
     const ctx = canvas.getContext("2d");
     bentoChartInstance = new Chart(ctx, {
         type: "bar",
         data: {
             labels: days,
-            datasets: [
-                { label: "Academics", data: dailyAcademics, backgroundColor: isDark ? "#bef264" : "#a3e635", borderRadius: 6, borderSkipped: false, barPercentage: 0.55 },
-                { label: "Food",      data: dailyFood,      backgroundColor: "#facc15",                      borderRadius: 6, borderSkipped: false, barPercentage: 0.55 },
-                { label: "Living",    data: dailyOther,     backgroundColor: "#fb923c",                      borderRadius: 6, borderSkipped: false, barPercentage: 0.55 }
-            ]
+            datasets: datasets
         },
+        plugins: [categoryDividersPlugin],
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: { duration: 450 },
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    filter: item => item.raw > 0,
                     callbacks: {
                         label: ctx => ` ${ctx.dataset.label}: Rs.${ctx.raw.toLocaleString("en-IN")}`
                     }
