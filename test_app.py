@@ -95,8 +95,21 @@ def run_tests():
     assert "CampusSpend" in res.text
     print("[PASS] 11. HTML Web Dashboard & Template Rendering")
 
+    # 12. Cross-Device Cloud Budget Synchronization
+    res = client.put("/api/budget", json={"monthly_limit": 20000.0})
+    assert res.status_code == 200
+    assert res.json()["monthly_limit"] == 20000.0
+
+    res = client.get("/api/budget")
+    assert res.status_code == 200
+    assert res.json()["monthly_limit"] == 20000.0
+
+    # Reset back to default
+    client.put("/api/budget", json={"monthly_limit": 15000.0})
+    print("[PASS] 12. Cross-Device Cloud Budget Synchronization (PUT & GET /api/budget)")
+
     print("==========================================")
-    print("ALL 11 AUTOMATED VERIFICATION TESTS PASSED!")
+    print("ALL 12 AUTOMATED VERIFICATION TESTS PASSED!")
     print("==========================================")
 
 if __name__ == "__main__":

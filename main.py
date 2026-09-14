@@ -245,13 +245,63 @@ def get_expense_stats(db: Session = Depends(get_db)):
     for e in expenses:
         payment_breakdown[e.payment_method] = payment_breakdown.get(e.payment_method, 0.0) + e.amount
 
+    budget = db.query(models.BudgetConfig).filter(models.BudgetConfig.id == 1).first()
+    if not budget:
+        budget = models.BudgetConfig(id=1, monthly_limit=15000.00)
+        db.add(budget)
+        db.commit()
+        db.refresh(budget)
+
     return {
         "total_spent": round(total_spent, 2),
         "total_count": total_count,
         "highest_expense": round(highest_expense, 2),
         "category_breakdown": {k: round(v, 2) for k, v in category_breakdown.items()},
-        "payment_method_breakdown": {k: round(v, 2) for k, v in payment_breakdown.items()}
+        "payment_method_breakdown": {k: round(v, 2) for k, v in payment_breakdown.items()},
+        "monthly_budget_limit": round(budget.monthly_limit, 2)
     }
+
+
+# ==========================================
+# Cross-Device Synchronized Budget Endpoints
+# ==========================================
+@app.get(
+    "/api/budget",
+    response_model=schemas.BudgetConfigResponse,
+    tags=["Budget & Planning"],
+    summary="Get cross-device synchronized monthly budget limit"
+)
+def get_budget_limit(db: Session = Depends(get_db)):
+    """Retrieves the cloud-synchronized monthly spending limit ceiling."""
+    budget = db.query(models.BudgetConfig).filter(models.BudgetConfig.id == 1).first()
+    if not budget:
+        budget = models.BudgetConfig(id=1, monthly_limit=15000.00)
+        db.add(budget)
+        db.commit()
+        db.refresh(budget)
+    return {"monthly_limit": budget.monthly_limit}
+
+
+@app.put(
+    "/api/budget",
+    response_model=schemas.BudgetConfigResponse,
+    tags=["Budget & Planning"],
+    summary="Update monthly budget limit synchronized across all devices"
+)
+def update_budget_limit(
+    budget_in: schemas.BudgetConfigUpdate,
+    db: Session = Depends(get_db)
+):
+    """Updates the cloud-synchronized monthly spending limit ceiling."""
+    budget = db.query(models.BudgetConfig).filter(models.BudgetConfig.id == 1).first()
+    if not budget:
+        budget = models.BudgetConfig(id=1, monthly_limit=budget_in.monthly_limit)
+        db.add(budget)
+    else:
+        budget.monthly_limit = budget_in.monthly_limit
+    db.commit()
+    db.refresh(budget)
+    return {"monthly_limit": budget.monthly_limit}
 
 
 # ==========================================

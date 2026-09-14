@@ -42,3 +42,12 @@ class ExpenseSummary(BaseModel):
     highest_expense: float
     category_breakdown: Dict[str, float]
     payment_method_breakdown: Dict[str, float]
+    monthly_budget_limit: Optional[float] = 15000.00
+
+
+class BudgetConfigUpdate(BaseModel):
+    monthly_limit: float = Field(..., gt=0, description="Monthly spending limit ceiling in INR")
+
+
+class BudgetConfigResponse(BaseModel):
+    monthly_limit: float

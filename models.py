@@ -29,3 +29,14 @@ class Expense(Base):
             "notes": self.notes,
             "created_at": str(self.created_at)
         }
+
+
+class BudgetConfig(Base):
+    """
+    Cloud-synchronized monthly budget configuration.
+    Stores the user's spending ceiling in the cloud database so all devices stay in sync.
+    """
+    __tablename__ = "budget_config"
+
+    id = Column(Integer, primary_key=True, default=1)
+    monthly_limit = Column(Float, nullable=False, default=15000.00)

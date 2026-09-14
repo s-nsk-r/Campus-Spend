@@ -318,6 +318,12 @@ async function fetchSummaryStats() {
         const stats    = await res.json();
         const totalSpent = stats.total_spent || 0;
 
+        // Sync cloud-synchronized budget limit across devices
+        if (stats.monthly_budget_limit && !isNaN(stats.monthly_budget_limit)) {
+            monthlyBudgetLimit = stats.monthly_budget_limit;
+            localStorage.setItem("camp_budget_limit", monthlyBudgetLimit);
+        }
+
         // Hero metrics
         setInner("heroBalanceDisplay", fmt(totalSpent));
         setInner("statHeroExpenses",   fmt(totalSpent));
@@ -476,13 +482,26 @@ function renderGoals(breakdown) {
     setStyle("goalTransportProg",   "width", `${Math.min(100, (transport / transportLimit) * 100)}%`);
 }
 
-function editBudgetLimit() {
+async function editBudgetLimit() {
     const input = prompt("Set your monthly budget ceiling in Rs.:", monthlyBudgetLimit);
     if (input !== null) {
         const val = parseFloat(input);
         if (!isNaN(val) && val > 0) {
             monthlyBudgetLimit = val;
             localStorage.setItem("camp_budget_limit", val);
+            
+            // Persist to Cloud Database so all other devices receive this update
+            try {
+                const res = await fetch("/api/budget", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ monthly_limit: val })
+                });
+                if (!res.ok) throw new Error("Cloud update failed");
+            } catch (err) {
+                console.warn("Could not sync budget to cloud database:", err);
+            }
+
             fetchSummaryStats();
             if (allExpensesCache && allExpensesCache.length >= 0) {
                 renderBudgetView(allExpensesCache);
@@ -491,6 +510,23 @@ function editBudgetLimit() {
         }
     }
 }
+
+// Auto-sync data & budget across devices when window is focused or phone is unlocked
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+        fetchSummaryStats();
+        fetchExpenses();
+    }
+});
+window.addEventListener("focus", () => {
+    fetchSummaryStats();
+    fetchExpenses();
+});
+setInterval(() => {
+    if (document.visibilityState === "visible") {
+        fetchSummaryStats();
+    }
+}, 20000);
 
 // =========================================================
 // Analytics View (VIEW 3)
