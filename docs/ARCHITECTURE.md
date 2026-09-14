@@ -1,8 +1,10 @@
 # Cloud Infrastructure & System Architecture
 
-**Course:** BACSE344 - Cloud Infrastructure and Architecture  
-**Project:** CampusSpend - Cloud-Native Student Expense & Budget Tracker  
-**Faculty:** Dr. P. Anandan | Slot: C1  
+**Course:** BACSE344 — Cloud Infrastructure and Architecture  
+**Slot:** C1 Slot | **Faculty:** Dr. P. Anandan  
+**Student Name:** Sanskar | **Registration No:** 25BCE5808  
+**Project:** CampusSpend — Cloud-Native Student Expense & Budget Tracker  
+**Live Application:** `https://campus-spend.onrender.com`  
 
 ---
 

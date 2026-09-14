@@ -1,7 +1,10 @@
 # Cloud Deployment Guide: Render.com & Neon.tech DBaaS
 
-**Course:** BACSE344 - Cloud Infrastructure and Architecture  
+**Course:** BACSE344 — Cloud Infrastructure and Architecture  
+**Slot:** C1 Slot | **Faculty:** Dr. P. Anandan  
+**Student Name:** Sanskar | **Registration No:** 25BCE5808  
 **Application:** CampusSpend  
+**Live Application:** `https://campus-spend.onrender.com`  
 
 This guide provides step-by-step instructions to deploy CampusSpend to production on the cloud for **100% free with zero credit card required**.
 
@@ -58,7 +61,7 @@ This guide provides step-by-step instructions to deploy CampusSpend to productio
 
 ## Step 4: Verification
 
-1. Open `https://<YOUR-RENDER-APP>.onrender.com` in your browser.
+1. Open `https://campus-spend.onrender.com` in your browser.
 2. Click **Seed Demo Data** to populate initial records.
-3. Open `https://<YOUR-RENDER-APP>.onrender.com/docs` to verify interactive Swagger API docs.
+3. Open `https://campus-spend.onrender.com/docs` to verify interactive Swagger API docs.
 4. Perform CRUD tests (Add, Edit, Delete).

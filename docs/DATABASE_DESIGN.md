@@ -1,6 +1,8 @@
 # Cloud Database Design & Schema Specification
 
-**Course:** BACSE344 - Cloud Infrastructure and Architecture  
+**Course:** BACSE344 — Cloud Infrastructure and Architecture  
+**Slot:** C1 Slot | **Faculty:** Dr. P. Anandan  
+**Student Name:** Sanskar | **Registration No:** 25BCE5808  
 **Database System:** PostgreSQL 16 (Cloud DBaaS - Neon.tech) / SQLite fallback  
 **ORM Layer:** SQLAlchemy 2.0  
 

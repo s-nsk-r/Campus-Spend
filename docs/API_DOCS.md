@@ -1,9 +1,11 @@
 # RESTful API Documentation & Specification
 
-**Course:** BACSE344 - Cloud Infrastructure and Architecture  
+**Course:** BACSE344 — Cloud Infrastructure and Architecture  
+**Slot:** C1 Slot | **Faculty:** Dr. P. Anandan  
+**Student Name:** Sanskar | **Registration No:** 25BCE5808  
 **Application:** CampusSpend REST API  
-**Interactive Swagger Docs URL:** `https://<YOUR-RENDER-APP-NAME>.onrender.com/docs`  
-**Alternative ReDoc URL:** `https://<YOUR-RENDER-APP-NAME>.onrender.com/redoc`  
+**Interactive Swagger Docs URL:** `https://campus-spend.onrender.com/docs`  
+**Alternative ReDoc URL:** `https://campus-spend.onrender.com/redoc`  
 
 ---
 

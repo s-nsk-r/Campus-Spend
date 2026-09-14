@@ -3,9 +3,9 @@
 > **BACSE344 — Cloud Infrastructure and Architecture (Digital Assignment)**  
 > **Faculty:** Dr. P. Anandan | **Slot:** C1  
 > **Author:** Sanskar (`s-nsk-r`) | **Registration No:** 25BCE5808 | **Course:** B.Tech CSE  
-> **Live Web Application:** [https://campus-spend-cloud.onrender.com](https://campus-spend-cloud.onrender.com) *(or your deployed Render URL)*  
-> **Interactive Swagger API Docs:** [https://campus-spend-cloud.onrender.com/docs](https://campus-spend-cloud.onrender.com/docs)  
-> **Alternative ReDoc API Docs:** [https://campus-spend-cloud.onrender.com/redoc](https://campus-spend-cloud.onrender.com/redoc)
+> **Live Web Application:** [https://campus-spend.onrender.com](https://campus-spend.onrender.com) *(or your deployed Render URL)*  
+> **Interactive Swagger API Docs:** [https://campus-spend.onrender.com/docs](https://campus-spend.onrender.com/docs)  
+> **Alternative ReDoc API Docs:** [https://campus-spend.onrender.com/redoc](https://campus-spend.onrender.com/redoc)
 
 ---
 
