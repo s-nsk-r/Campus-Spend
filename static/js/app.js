@@ -1,25 +1,37 @@
 /**
- * CampusSpend — Modern Fintech Dashboard Controller (ACRU Style)
- * Connects with FastAPI REST API and coordinates dynamic Bento widgets.
+ * CampusSpend — Application Controller
+ * Handles views, CRUD, analytics, budget, and theme.
  */
 
-let bentoChartInstance = null;
-let itemToDeleteId = null;
-let searchDebounceTimer = null;
-let allExpensesCache = [];
+let bentoChartInstance   = null;
+let donutChartInstance   = null;
+let itemToDeleteId       = null;
+let searchDebounceTimer  = null;
+let allExpensesCache     = [];
+let currentView          = 'dashboard';
 
-// Monthly budget target stored in local storage
 let monthlyBudgetLimit = parseFloat(localStorage.getItem("camp_budget_limit")) || 15000.00;
 
-// Category colors for segmented bars & charts
+// Category colour map — NO emojis
 const CATEGORY_COLORS = {
-    "Food & Dining":        { bg: "#fb923c", class: "seg-orange", badge: "b-food", emoji: "🍔" },
-    "Academics & Books":    { bg: "#a3e635", class: "seg-green",  badge: "b-academics", emoji: "📚" },
-    "Transportation":       { bg: "#38bdf8", class: "seg-blue",   badge: "b-transport", emoji: "🚌" },
-    "Hostel & Utilities":   { bg: "#c084fc", class: "seg-purple", badge: "b-hostel", emoji: "🏠" },
-    "Entertainment":        { bg: "#f472b6", class: "seg-pink",   badge: "b-entertain", emoji: "🎬" },
-    "Healthcare":           { bg: "#34d399", class: "seg-emerald",badge: "b-health", emoji: "💊" },
-    "Others":               { bg: "#9ca3af", class: "seg-gray",   badge: "b-others", emoji: "📦" }
+    "Food & Dining":      { bg: "#fb923c", class: "seg-orange", badge: "b-food",      label: "Food & Dining"      },
+    "Academics & Books":  { bg: "#a3e635", class: "seg-green",  badge: "b-academics",  label: "Academics & Books"  },
+    "Transportation":     { bg: "#38bdf8", class: "seg-blue",   badge: "b-transport",  label: "Transportation"      },
+    "Hostel & Utilities": { bg: "#c084fc", class: "seg-purple", badge: "b-hostel",     label: "Hostel & Utilities"  },
+    "Entertainment":      { bg: "#f472b6", class: "seg-pink",   badge: "b-entertain",  label: "Entertainment"       },
+    "Healthcare":         { bg: "#34d399", class: "seg-emerald",badge: "b-health",     label: "Healthcare"          },
+    "Others":             { bg: "#9ca3af", class: "seg-gray",   badge: "b-others",     label: "Others"              }
+};
+
+// Category budget suggestions (for budget view)
+const CATEGORY_BUDGETS = {
+    "Food & Dining":      5000,
+    "Academics & Books":  4000,
+    "Transportation":     2000,
+    "Hostel & Utilities": 2500,
+    "Entertainment":      1000,
+    "Healthcare":          500,
+    "Others":             1000
 };
 
 // =========================================================
@@ -28,26 +40,24 @@ const CATEGORY_COLORS = {
 document.addEventListener("DOMContentLoaded", () => {
     initTheme();
 
-    // Default form date to today
     const dateInput = document.getElementById("formDate");
     if (dateInput) dateInput.value = new Date().toISOString().split("T")[0];
 
-    // Load expenses & analytics
     fetchExpenses();
     fetchSummaryStats();
 });
 
 // =========================================================
-// Theme Management (Light vs True-Black Dark)
+// Theme Management
 // =========================================================
 function initTheme() {
-    const saved = localStorage.getItem("camp_theme") || "light";
+    const saved = localStorage.getItem("camp_theme") || "dark";
     applyTheme(saved);
 }
 
 function toggleTheme() {
-    const current = document.documentElement.getAttribute("data-theme") || "light";
-    applyTheme(current === "light" ? "dark" : "light");
+    const current = document.documentElement.getAttribute("data-theme") || "dark";
+    applyTheme(current === "dark" ? "light" : "dark");
 }
 
 function applyTheme(theme) {
@@ -57,39 +67,97 @@ function applyTheme(theme) {
     const icon = document.getElementById("themeIcon");
     if (icon) {
         icon.innerHTML = theme === "dark"
-            // Sun icon for switching back to light
             ? '<path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/>'
-            // Moon icon for switching to dark
             : '<path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>';
     }
 
-    if (bentoChartInstance) {
-        renderBentoChart(allExpensesCache);
-    }
+    if (bentoChartInstance) renderBentoChart(allExpensesCache);
+    if (donutChartInstance)  updateDonutChart(buildCategoryBreakdown(allExpensesCache));
 }
 
 // =========================================================
-// Layout Views & Sidebar Navigation
+// View Navigation
 // =========================================================
-function switchView(viewName, el) {
+const VIEW_IDS = {
+    dashboard:    "dashboardView",
+    transactions: "transactionsView",
+    analytics:    "analyticsView",
+    budget:       "budgetView"
+};
+
+function switchView(viewName, navEl) {
+    if (!VIEW_IDS[viewName]) return;
+
+    currentView = viewName;
+
+    // Update active nav item
     document.querySelectorAll(".nav-item").forEach(item => item.classList.remove("active"));
-    if (el) el.classList.add("active");
+    if (navEl) navEl.classList.add("active");
 
-    const dashView  = document.getElementById("dashboardView");
-    const transView = document.getElementById("transactionsView");
+    // Alternatively find nav item by view name when called programmatically
+    if (!navEl) {
+        document.querySelectorAll(".nav-item").forEach(item => {
+            if (item.getAttribute("onclick") && item.getAttribute("onclick").includes(`'${viewName}'`)) {
+                item.classList.add("active");
+            }
+        });
+    }
 
-    if (viewName === "transactions") {
-        dashView.style.display  = "none";
-        transView.style.display = "block";
-    } else {
-        dashView.style.display  = "grid";
-        transView.style.display = "none";
+    // Show the right panel
+    Object.entries(VIEW_IDS).forEach(([name, id]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (name === viewName) {
+            el.style.display = name === "dashboard" ? "grid" : "block";
+        } else {
+            el.style.display = "none";
+        }
+    });
+
+    // Scroll content container to top
+    const container = document.getElementById("contentContainer");
+    if (container) container.scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: "instant" });
+
+    // Sync analytics / budget views on switch
+    if (viewName === "analytics") renderAnalyticsView(allExpensesCache);
+    if (viewName === "budget")    renderBudgetView(allExpensesCache);
+
+    // Clear global search when switching views (optional UX improvement)
+    const searchBar = document.getElementById("searchInput");
+    if (searchBar && viewName !== "transactions") {
+        searchBar.value = "";
+        toggleSearchClear(false);
     }
 }
 
 function toggleSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    sidebar.classList.toggle("collapsed");
+    document.getElementById("sidebar").classList.toggle("collapsed");
+}
+
+// =========================================================
+// Global Search
+// =========================================================
+function handleGlobalSearch() {
+    const val = document.getElementById("searchInput").value;
+    toggleSearchClear(val.length > 0);
+
+    // If not on transactions, switch to it so user sees results
+    if (val.trim() && currentView !== "transactions") {
+        switchView("transactions", null);
+    }
+    debounceSearch();
+}
+
+function clearSearch() {
+    document.getElementById("searchInput").value = "";
+    toggleSearchClear(false);
+    fetchExpenses();
+}
+
+function toggleSearchClear(show) {
+    const btn = document.getElementById("searchClearBtn");
+    if (btn) btn.style.display = show ? "flex" : "none";
 }
 
 // =========================================================
@@ -101,11 +169,11 @@ async function fetchExpenses() {
     const searchVal   = topSearch || tableSearch;
 
     const categoryVal = document.getElementById("categoryFilter")?.value || "All";
-    const paymentVal  = document.getElementById("paymentFilter")?.value || "All";
+    const paymentVal  = document.getElementById("paymentFilter")?.value  || "All";
 
     const params = new URLSearchParams();
-    if (searchVal.trim())                     params.append("search", searchVal.trim());
-    if (categoryVal && categoryVal !== "All") params.append("category", categoryVal);
+    if (searchVal.trim())                     params.append("search",         searchVal.trim());
+    if (categoryVal && categoryVal !== "All") params.append("category",       categoryVal);
     if (paymentVal  && paymentVal  !== "All") params.append("payment_method", paymentVal);
 
     try {
@@ -115,23 +183,27 @@ async function fetchExpenses() {
         const data = await res.json();
         allExpensesCache = data;
 
-        // Render both views
         renderTable(data);
         renderRecentStream(data);
 
-        // Update badge counts
         const countBadge = document.getElementById("navBadgeCount");
         if (countBadge) countBadge.innerText = data.length;
 
-        // Sync chart
         renderBentoChart(data);
+
+        // Refresh current analytics/budget view if open
+        if (currentView === "analytics") renderAnalyticsView(data);
+        if (currentView === "budget")    renderBudgetView(data);
+
     } catch (err) {
         console.error("Fetch error:", err);
         showToast("Error connecting to database", "error");
     }
 }
 
-// Render full table view
+// =========================================================
+// Table Rendering
+// =========================================================
 function renderTable(expenses) {
     const tbody = document.getElementById("expensesTableBody");
     if (!tbody) return;
@@ -141,7 +213,7 @@ function renderTable(expenses) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="6" style="text-align:center;padding:3rem;color:var(--text-muted);">
-                    No expenses found. Click <strong>+ Add Expense</strong> to record one.
+                    No expenses found. Click <strong>Add Expense</strong> to record one.
                 </td>
             </tr>
         `;
@@ -157,66 +229,68 @@ function renderTable(expenses) {
             : "N/A";
 
         const safeTitle = escapeHtml(exp.title);
-        const escapedTitleAttr = safeTitle.replace(/'/g, "\\'");
+        const escapedAttr = safeTitle.replace(/'/g, "\\'");
 
         tr.innerHTML = `
             <td style="color:var(--text-sub);white-space:nowrap;font-size:0.8rem;">${dateFormatted}</td>
             <td>
                 <div style="font-weight:700;color:var(--text-main);">${safeTitle}</div>
-                ${exp.notes ? `<div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(exp.notes)}</div>` : ""}
+                ${exp.notes ? `<div style="font-size:0.73rem;color:var(--text-muted);margin-top:2px;">${escapeHtml(exp.notes)}</div>` : ""}
             </td>
-            <td><span class="badge-pill ${catInfo.badge}">${catInfo.emoji} ${escapeHtml(exp.category)}</span></td>
+            <td><span class="badge-pill ${catInfo.badge}">${escapeHtml(exp.category)}</span></td>
             <td><span class="tiny-badge">${escapeHtml(exp.payment_method)}</span></td>
-            <td style="font-weight:800;color:var(--text-main);">₹${exp.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+            <td style="font-weight:800;color:var(--text-main);white-space:nowrap;">Rs.${exp.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
             <td style="text-align:right;white-space:nowrap;">
                 <button onclick="openEditModal(${exp.id})" class="btn-mini">Edit</button>
-                <button onclick="openDeleteModal(${exp.id}, '${escapedTitleAttr}')" class="btn-mini danger" style="margin-left:4px;">Delete</button>
+                <button onclick="openDeleteModal(${exp.id}, '${escapedAttr}')" class="btn-mini danger" style="margin-left:4px;">Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-// Render right column recent stream
+// =========================================================
+// Recent Transactions Stream (Dashboard)
+// =========================================================
 function renderRecentStream(expenses) {
     const stream = document.getElementById("recentTransactionsStream");
     if (!stream) return;
     stream.innerHTML = "";
 
     if (expenses.length === 0) {
-        stream.innerHTML = `<div class="stream-empty">No transactions yet.<br>Add your first campus spend!</div>`;
+        stream.innerHTML = `<div class="stream-empty">No transactions yet.<br>Add your first campus expense!</div>`;
         return;
     }
 
-    // Show latest 6 records
-    const recent = expenses.slice(0, 6);
-    recent.forEach(exp => {
+    expenses.slice(0, 7).forEach(exp => {
         const item = document.createElement("div");
         item.className = "stream-item";
 
         const catInfo = CATEGORY_COLORS[exp.category] || CATEGORY_COLORS["Others"];
-        const safeTitle = escapeHtml(exp.title);
-        const escapedTitleAttr = safeTitle.replace(/'/g, "\\'");
-
+        const safeTitle  = escapeHtml(exp.title);
+        const escapedAttr = safeTitle.replace(/'/g, "\\'");
         const dateStr = exp.expense_date
             ? new Date(exp.expense_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })
             : "Recent";
 
+        // Use first letter of category as avatar text instead of emoji
+        const avatarLetter = (exp.category || "O")[0].toUpperCase();
+
         item.innerHTML = `
-            <div class="stream-avatar" style="background:${catInfo.bg}22; color:${catInfo.bg};">
-                ${catInfo.emoji}
+            <div class="stream-avatar" style="background:${catInfo.bg}22; color:${catInfo.bg}; font-size:0.75rem; font-weight:800;">
+                ${avatarLetter}
             </div>
             <div class="stream-details">
                 <div class="stream-title">${safeTitle}</div>
-                <div class="stream-date">${dateStr} • ${escapeHtml(exp.payment_method)}</div>
+                <div class="stream-date">${dateStr} &bull; ${escapeHtml(exp.payment_method)}</div>
             </div>
             <div class="stream-right">
-                <div class="stream-amt">-₹${exp.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                <div class="stream-status">Completed</div>
+                <div class="stream-amt">-Rs.${exp.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                <div class="stream-status">Recorded</div>
             </div>
             <div class="stream-actions-hover">
                 <button onclick="openEditModal(${exp.id})" class="btn-mini">Edit</button>
-                <button onclick="openDeleteModal(${exp.id}, '${escapedTitleAttr}')" class="btn-mini danger">×</button>
+                <button onclick="openDeleteModal(${exp.id}, '${escapedAttr}')" class="btn-mini danger">×</button>
             </div>
         `;
         stream.appendChild(item);
@@ -224,98 +298,113 @@ function renderRecentStream(expenses) {
 }
 
 // =========================================================
-// Summary Stats & Bento Analytics
+// Summary Stats & Dashboard Analytics
 // =========================================================
 async function fetchSummaryStats() {
     try {
         const res = await fetch("/api/summary/stats");
         if (!res.ok) return;
 
-        const stats = await res.json();
+        const stats    = await res.json();
         const totalSpent = stats.total_spent || 0;
 
-        // 1. Hero Card Metrics
-        const heroAmt = document.getElementById("heroBalanceDisplay");
-        if (heroAmt) heroAmt.innerText = `₹${totalSpent.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+        // Hero metrics
+        setInner("heroBalanceDisplay", fmt(totalSpent));
+        setInner("statHeroExpenses",   fmt(totalSpent));
+        setInner("statMonthlyBudget",  fmtInt(monthlyBudgetLimit));
 
-        const heroExp = document.getElementById("statHeroExpenses");
-        if (heroExp) heroExp.innerText = `₹${totalSpent.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+        const saved    = Math.max(0, monthlyBudgetLimit - totalSpent);
+        const savedPct = monthlyBudgetLimit > 0 ? Math.round((saved / monthlyBudgetLimit) * 100) : 100;
+        setInner("statHeroSaved",    fmt(saved));
+        setInner("statSavedPercent", `${savedPct}% remaining`);
 
-        const budgetEl = document.getElementById("statMonthlyBudget");
-        if (budgetEl) budgetEl.innerText = `₹${monthlyBudgetLimit.toLocaleString("en-IN")}`;
+        // Spending bar
+        const spentPct = monthlyBudgetLimit > 0 ? Math.min(100, Math.round((totalSpent / monthlyBudgetLimit) * 100)) : 0;
+        setStyle("spendingProgressBar", "width", `${spentPct}%`);
+        setInner("spendingSpentLabel", `Rs.${totalSpent.toLocaleString("en-IN")}`);
+        setInner("spendingLimitLabel", `Rs.${monthlyBudgetLimit.toLocaleString("en-IN")}`);
 
-        const savedAmount = Math.max(0, monthlyBudgetLimit - totalSpent);
-        const heroSaved = document.getElementById("statHeroSaved");
-        if (heroSaved) heroSaved.innerText = `₹${savedAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+        // Budget view bars
+        setStyle("budgetProgressBarMain", "width", `${spentPct}%`);
+        setInner("budgetSpentVal",       fmt(totalSpent));
+        setInner("budgetLimitVal",       fmtInt(monthlyBudgetLimit));
+        setInner("budgetRemainingVal",   fmt(saved));
+        setInner("budgetPctLabel",       `${spentPct}% used`);
+        setInner("budgetRemainingLabel", `Rs.${saved.toLocaleString("en-IN")} remaining`);
 
-        const savedPct = Math.round((savedAmount / monthlyBudgetLimit) * 100);
-        const savedPctEl = document.getElementById("statSavedPercent");
-        if (savedPctEl) savedPctEl.innerText = `${savedPct}% remaining`;
-
-        // 2. Spending Limit Progress Bar
-        const progBar = document.getElementById("spendingProgressBar");
-        const spentPct = Math.min(100, Math.round((totalSpent / monthlyBudgetLimit) * 100));
-        if (progBar) progBar.style.width = `${spentPct}%`;
-
-        const spentLbl = document.getElementById("spendingSpentLabel");
-        if (spentLbl) spentLbl.innerText = `₹${totalSpent.toLocaleString("en-IN")}`;
-
-        const limitLbl = document.getElementById("spendingLimitLabel");
-        if (limitLbl) limitLbl.innerText = `₹${monthlyBudgetLimit.toLocaleString("en-IN")}`;
-
-        // 3. Cost Analysis Breakdown
+        // Cost analysis
         renderCostAnalysis(stats.category_breakdown || {}, totalSpent);
 
-        // 4. Financial Health Radial Half-Circle Gauge
+        // Health gauge
         renderHealthGauge(savedPct);
 
-        // 5. Goals Tracker Sync
+        // Goals
         renderGoals(stats.category_breakdown || {});
+
+        // Analytics page
+        if (currentView === "analytics") renderAnalyticsView(allExpensesCache, stats);
+        if (currentView === "budget")    renderBudgetView(allExpensesCache, stats);
+
+        // Analytics summary fields (always update for fast switch)
+        updateAnalyticsSummary(stats, totalSpent);
 
     } catch (err) {
         console.error("Summary error:", err);
     }
 }
 
-// Cost analysis segmented bar & category breakdown
-function renderCostAnalysis(breakdown, totalSpent) {
-    const costTotalEl = document.getElementById("costAnalysisTotal");
-    if (costTotalEl) costTotalEl.innerText = `₹${totalSpent.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+function updateAnalyticsSummary(stats, totalSpent) {
+    const count    = stats.total_count || 0;
+    const highest  = stats.highest_expense || 0;
+    const avg      = count > 0 ? totalSpent / count : 0;
 
-    const barEl = document.getElementById("costSegmentedBar");
+    let topCat = "—";
+    let maxAmt = 0;
+    for (const [cat, amt] of Object.entries(stats.category_breakdown || {})) {
+        if (amt > maxAmt) { maxAmt = amt; topCat = cat; }
+    }
+
+    setInner("anTotalSpent", fmt(totalSpent));
+    setInner("anTotalCount", count);
+    setInner("anHighest",    fmt(highest));
+    setInner("anAverage",    fmt(avg));
+    setInner("anTopCat",     topCat);
+}
+
+function renderCostAnalysis(breakdown, totalSpent) {
+    setInner("costAnalysisTotal", fmt(totalSpent));
+
+    const barEl  = document.getElementById("costSegmentedBar");
     const listEl = document.getElementById("categoryBreakdownList");
     if (!barEl || !listEl) return;
 
-    barEl.innerHTML = "";
+    barEl.innerHTML  = "";
     listEl.innerHTML = "";
 
     const entries = Object.entries(breakdown);
     if (entries.length === 0 || totalSpent === 0) {
-        barEl.innerHTML = `<div class="seg-item seg-gray" style="width: 100%;"></div>`;
+        barEl.innerHTML  = `<div class="seg-item seg-gray" style="width:100%;"></div>`;
         listEl.innerHTML = `<div class="cat-list-empty">No expenses recorded yet</div>`;
         return;
     }
 
     entries.sort((a, b) => b[1] - a[1]);
-
     entries.forEach(([cat, amt]) => {
-        const pct = Math.round((amt / totalSpent) * 100);
+        const pct     = Math.round((amt / totalSpent) * 100);
         const catInfo = CATEGORY_COLORS[cat] || CATEGORY_COLORS["Others"];
 
-        // Segment bar slice
         const seg = document.createElement("div");
-        seg.className = `seg-item ${catInfo.class}`;
+        seg.className   = `seg-item ${catInfo.class}`;
         seg.style.width = `${pct}%`;
-        seg.title = `${cat}: ₹${amt.toLocaleString("en-IN")} (${pct}%)`;
+        seg.title       = `${cat}: Rs.${amt.toLocaleString("en-IN")} (${pct}%)`;
         barEl.appendChild(seg);
 
-        // List row
         const row = document.createElement("div");
         row.className = "cat-item-row";
         row.innerHTML = `
             <div class="cat-label-wrap">
                 <span class="cat-bullet" style="background:${catInfo.bg}"></span>
-                <span>${catInfo.emoji} ${cat}</span>
+                <span>${cat}</span>
             </div>
             <span class="cat-pct">${pct}%</span>
         `;
@@ -323,105 +412,241 @@ function renderCostAnalysis(breakdown, totalSpent) {
     });
 }
 
-// Financial Health Radial Gauge
 function renderHealthGauge(savedPct) {
     const scoreDisplay = document.getElementById("healthScoreDisplay");
-    const pctText = document.getElementById("gaugePercentText");
-    const arc = document.getElementById("gaugeArc");
+    const pctText      = document.getElementById("gaugePercentText");
+    const arc          = document.getElementById("gaugeArc");
 
     if (pctText) pctText.innerText = `${savedPct}%`;
 
     if (scoreDisplay) {
         if (savedPct >= 60) {
-            scoreDisplay.innerText = "Optimal";
+            scoreDisplay.innerText  = "Optimal";
             scoreDisplay.style.color = "var(--accent-lime-dark)";
         } else if (savedPct >= 30) {
-            scoreDisplay.innerText = "Moderate";
+            scoreDisplay.innerText  = "Moderate";
             scoreDisplay.style.color = "var(--color-yellow)";
         } else {
-            scoreDisplay.innerText = "Warning";
+            scoreDisplay.innerText  = "Warning";
             scoreDisplay.style.color = "var(--danger)";
         }
     }
 
     if (arc) {
-        // Half circle circumference is ~ 141.37
         const maxOffset = 141.37;
-        const progress = Math.max(0, Math.min(100, savedPct)) / 100;
-        const offset = maxOffset * (1 - progress);
-        arc.style.strokeDashoffset = offset;
+        const progress  = Math.max(0, Math.min(100, savedPct)) / 100;
+        arc.style.strokeDashoffset = maxOffset * (1 - progress);
     }
 }
 
-// Goal tracker progress
 function renderGoals(breakdown) {
-    const academicSpend = breakdown["Academics & Books"] || 0;
-    const foodSpend = breakdown["Food & Dining"] || 0;
-    const transportSpend = breakdown["Transportation"] || 0;
+    const academic  = breakdown["Academics & Books"] || 0;
+    const food      = breakdown["Food & Dining"]     || 0;
+    const transport = breakdown["Transportation"]    || 0;
 
-    const elAcad = document.getElementById("goalAcademicAmount");
-    const elAcadProg = document.getElementById("goalAcademicProg");
-    if (elAcad) elAcad.innerText = `₹${academicSpend.toLocaleString("en-IN")} / ₹4,000`;
-    if (elAcadProg) elAcadProg.style.width = `${Math.min(100, (academicSpend / 4000) * 100)}%`;
+    setInner("goalAcademicAmount",  `Rs.${academic.toLocaleString("en-IN")} / Rs.4,000`);
+    setStyle("goalAcademicProg",    "width", `${Math.min(100, (academic  / 4000) * 100)}%`);
 
-    const elFood = document.getElementById("goalFoodAmount");
-    const elFoodProg = document.getElementById("goalFoodProg");
-    if (elFood) elFood.innerText = `₹${foodSpend.toLocaleString("en-IN")} / ₹5,000`;
-    if (elFoodProg) elFoodProg.style.width = `${Math.min(100, (foodSpend / 5000) * 100)}%`;
+    setInner("goalFoodAmount",      `Rs.${food.toLocaleString("en-IN")} / Rs.5,000`);
+    setStyle("goalFoodProg",        "width", `${Math.min(100, (food      / 5000) * 100)}%`);
 
-    const elTrans = document.getElementById("goalTransportAmount");
-    const elTransProg = document.getElementById("goalTransportProg");
-    if (elTrans) elTrans.innerText = `₹${transportSpend.toLocaleString("en-IN")} / ₹2,000`;
-    if (elTransProg) elTransProg.style.width = `${Math.min(100, (transportSpend / 2000) * 100)}%`;
+    setInner("goalTransportAmount", `Rs.${transport.toLocaleString("en-IN")} / Rs.2,000`);
+    setStyle("goalTransportProg",   "width", `${Math.min(100, (transport / 2000) * 100)}%`);
 }
 
-// Customizable Budget Limit
 function editBudgetLimit() {
-    const input = prompt("Set your monthly budget ceiling in ₹:", monthlyBudgetLimit);
+    const input = prompt("Set your monthly budget ceiling in Rs.:", monthlyBudgetLimit);
     if (input !== null) {
         const val = parseFloat(input);
         if (!isNaN(val) && val > 0) {
             monthlyBudgetLimit = val;
             localStorage.setItem("camp_budget_limit", val);
             fetchSummaryStats();
-            showToast(`Budget ceiling updated to ₹${val.toLocaleString("en-IN")}`, "success");
+            showToast(`Budget updated to Rs.${val.toLocaleString("en-IN")}`, "success");
         }
     }
 }
 
 // =========================================================
-// Bento Rounded Bar Chart
+// Analytics View (VIEW 3)
+// =========================================================
+function renderAnalyticsView(expenses) {
+    const breakdown = buildCategoryBreakdown(expenses);
+    updateDonutChart(breakdown);
+
+    // Payment method breakdown
+    const paymentBreakdown = {};
+    expenses.forEach(e => {
+        paymentBreakdown[e.payment_method] = (paymentBreakdown[e.payment_method] || 0) + e.amount;
+    });
+
+    const paymentEl = document.getElementById("analyticsPaymentList");
+    if (paymentEl) {
+        paymentEl.innerHTML = "";
+        const total = Object.values(paymentBreakdown).reduce((a, b) => a + b, 0) || 1;
+        Object.entries(paymentBreakdown).sort((a, b) => b[1] - a[1]).forEach(([method, amt]) => {
+            const pct = Math.round((amt / total) * 100);
+            const row = document.createElement("div");
+            row.className = "cat-item-row";
+            row.innerHTML = `
+                <div class="cat-label-wrap">
+                    <span class="cat-bullet" style="background:var(--accent-lime)"></span>
+                    <span>${method}</span>
+                </div>
+                <span class="cat-pct">${pct}%</span>
+            `;
+            paymentEl.appendChild(row);
+        });
+        if (Object.keys(paymentBreakdown).length === 0) {
+            paymentEl.innerHTML = `<div class="cat-list-empty">No data yet</div>`;
+        }
+    }
+}
+
+function buildCategoryBreakdown(expenses) {
+    const breakdown = {};
+    expenses.forEach(e => {
+        breakdown[e.category] = (breakdown[e.category] || 0) + e.amount;
+    });
+    return breakdown;
+}
+
+function updateDonutChart(categoryData) {
+    const canvas      = document.getElementById("analyticsDonutChart");
+    const placeholder = document.getElementById("analyticsDonutPlaceholder");
+    if (!canvas) return;
+
+    const labels = Object.keys(categoryData);
+    const values = Object.values(categoryData);
+    const isDark  = document.documentElement.getAttribute("data-theme") === "dark";
+
+    if (labels.length === 0) {
+        canvas.style.display      = "none";
+        if (placeholder) placeholder.style.display = "block";
+        if (donutChartInstance) { donutChartInstance.destroy(); donutChartInstance = null; }
+        return;
+    }
+
+    canvas.style.display = "block";
+    if (placeholder) placeholder.style.display = "none";
+
+    const colors = labels.map(l => (CATEGORY_COLORS[l] || CATEGORY_COLORS["Others"]).bg);
+    const legendColor = isDark ? "#9ca3af" : "#6b7280";
+    const borderCol   = isDark ? "#111114" : "#f3f4f7";
+
+    if (donutChartInstance) {
+        donutChartInstance.data.labels                      = labels;
+        donutChartInstance.data.datasets[0].data            = values;
+        donutChartInstance.data.datasets[0].backgroundColor = colors;
+        donutChartInstance.data.datasets[0].borderColor     = borderCol;
+        donutChartInstance.options.plugins.legend.labels.color = legendColor;
+        donutChartInstance.update();
+        return;
+    }
+
+    const ctx = canvas.getContext("2d");
+    donutChartInstance = new Chart(ctx, {
+        type: "doughnut",
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderColor: borderCol,
+                borderWidth: 2,
+                hoverOffset: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: "right",
+                    labels: { color: legendColor, font: { size: 12 }, boxWidth: 13, padding: 14 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ` Rs.${ctx.raw.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                    }
+                }
+            },
+            cutout: "68%"
+        }
+    });
+}
+
+// =========================================================
+// Budget View (VIEW 4)
+// =========================================================
+function renderBudgetView(expenses) {
+    const breakdown = buildCategoryBreakdown(expenses);
+    const listEl    = document.getElementById("budgetCategoryList");
+    if (!listEl) return;
+
+    listEl.innerHTML = "";
+
+    const allCats = Object.keys(CATEGORY_BUDGETS);
+    if (Object.keys(breakdown).length === 0) {
+        listEl.innerHTML = `<div class="cat-list-empty">No expenses recorded yet</div>`;
+        return;
+    }
+
+    allCats.forEach(cat => {
+        const spent   = breakdown[cat] || 0;
+        const limit   = CATEGORY_BUDGETS[cat];
+        const pct     = Math.min(100, Math.round((spent / limit) * 100));
+        const catInfo = CATEGORY_COLORS[cat] || CATEGORY_COLORS["Others"];
+        const over    = spent > limit;
+
+        const row = document.createElement("div");
+        row.className = "budget-cat-row";
+        row.innerHTML = `
+            <div class="budget-cat-header">
+                <div class="budget-cat-name">
+                    <span class="cat-bullet" style="background:${catInfo.bg};width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:6px;"></span>
+                    ${cat}
+                </div>
+                <div class="budget-cat-amounts">
+                    <span style="font-weight:700;color:${over ? 'var(--danger)' : 'var(--text-main)'};">Rs.${spent.toLocaleString("en-IN")}</span>
+                    <span style="color:var(--text-muted);font-size:0.8rem;"> / Rs.${limit.toLocaleString("en-IN")}</span>
+                </div>
+            </div>
+            <div class="spending-progress-bar" style="height:8px;margin-top:6px;">
+                <div class="spending-fill" style="width:${pct}%;background:${over ? 'var(--danger)' : catInfo.bg};"></div>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;text-align:right;">${pct}% used${over ? ' — over budget' : ''}</div>
+        `;
+        listEl.appendChild(row);
+    });
+}
+
+// =========================================================
+// Stacked Bar Chart (Dashboard Hero)
 // =========================================================
 function renderBentoChart(expenses) {
     const canvas = document.getElementById("bentoBarChart");
     if (!canvas) return;
 
-    // Group last 7 days or days of week
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const days           = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dailyAcademics = [0, 0, 0, 0, 0, 0, 0];
-    const dailyFood = [0, 0, 0, 0, 0, 0, 0];
-    const dailyOther = [0, 0, 0, 0, 0, 0, 0];
+    const dailyFood      = [0, 0, 0, 0, 0, 0, 0];
+    const dailyOther     = [0, 0, 0, 0, 0, 0, 0];
 
     expenses.forEach(exp => {
         if (!exp.expense_date) return;
-        const d = new Date(exp.expense_date + "T00:00:00");
+        const d      = new Date(exp.expense_date + "T00:00:00");
         const dayIdx = d.getDay();
-        if (exp.category === "Academics & Books") {
-            dailyAcademics[dayIdx] += exp.amount;
-        } else if (exp.category === "Food & Dining") {
-            dailyFood[dayIdx] += exp.amount;
-        } else {
-            dailyOther[dayIdx] += exp.amount;
-        }
+        if      (exp.category === "Academics & Books") dailyAcademics[dayIdx] += exp.amount;
+        else if (exp.category === "Food & Dining")     dailyFood[dayIdx]      += exp.amount;
+        else                                            dailyOther[dayIdx]     += exp.amount;
     });
 
-    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
-    const gridColor = isDark ? "#232328" : "#f0f2f5";
+    const isDark     = document.documentElement.getAttribute("data-theme") === "dark";
+    const gridColor  = isDark ? "#232328" : "#f0f2f5";
     const labelColor = isDark ? "#6b7280" : "#9ca3af";
 
-    if (bentoChartInstance) {
-        bentoChartInstance.destroy();
-    }
+    if (bentoChartInstance) { bentoChartInstance.destroy(); bentoChartInstance = null; }
 
     const ctx = canvas.getContext("2d");
     bentoChartInstance = new Chart(ctx, {
@@ -429,30 +654,9 @@ function renderBentoChart(expenses) {
         data: {
             labels: days,
             datasets: [
-                {
-                    label: "Academics",
-                    data: dailyAcademics,
-                    backgroundColor: isDark ? "#bef264" : "#a3e635",
-                    borderRadius: 6,
-                    borderSkipped: false,
-                    barPercentage: 0.55
-                },
-                {
-                    label: "Food",
-                    data: dailyFood,
-                    backgroundColor: "#facc15",
-                    borderRadius: 6,
-                    borderSkipped: false,
-                    barPercentage: 0.55
-                },
-                {
-                    label: "Living",
-                    data: dailyOther,
-                    backgroundColor: "#fb923c",
-                    borderRadius: 6,
-                    borderSkipped: false,
-                    barPercentage: 0.55
-                }
+                { label: "Academics", data: dailyAcademics, backgroundColor: isDark ? "#bef264" : "#a3e635", borderRadius: 6, borderSkipped: false, barPercentage: 0.55 },
+                { label: "Food",      data: dailyFood,      backgroundColor: "#facc15",                      borderRadius: 6, borderSkipped: false, barPercentage: 0.55 },
+                { label: "Living",    data: dailyOther,     backgroundColor: "#fb923c",                      borderRadius: 6, borderSkipped: false, barPercentage: 0.55 }
             ]
         },
         options: {
@@ -462,34 +666,20 @@ function renderBentoChart(expenses) {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: ctx => ` ${ctx.dataset.label}: ₹${ctx.raw.toLocaleString("en-IN")}`
+                        label: ctx => ` ${ctx.dataset.label}: Rs.${ctx.raw.toLocaleString("en-IN")}`
                     }
                 }
             },
             scales: {
-                x: {
-                    stacked: true,
-                    grid: { display: false },
-                    ticks: { color: labelColor, font: { family: "Plus Jakarta Sans", size: 11, weight: 600 } },
-                    border: { display: false }
-                },
-                y: {
-                    stacked: true,
-                    grid: { color: gridColor },
-                    ticks: {
-                        color: labelColor,
-                        font: { family: "Plus Jakarta Sans", size: 10 },
-                        callback: val => `₹${val}`
-                    },
-                    border: { display: false }
-                }
+                x: { stacked: true, grid: { display: false },  ticks: { color: labelColor, font: { size: 11, weight: 600 } }, border: { display: false } },
+                y: { stacked: true, grid: { color: gridColor }, ticks: { color: labelColor, font: { size: 10 }, callback: v => `Rs.${v}` }, border: { display: false } }
             }
         }
     });
 }
 
 // =========================================================
-// Modals & CRUD Actions
+// Modals & CRUD
 // =========================================================
 function openAddModal() {
     document.getElementById("modalTitle").innerText = "Add New Expense";
@@ -505,14 +695,14 @@ async function openEditModal(id) {
         if (!res.ok) throw new Error("Record not found");
 
         const data = await res.json();
-        document.getElementById("modalTitle").innerText    = "Edit Expense";
-        document.getElementById("expenseId").value         = data.id;
-        document.getElementById("formTitle").value         = data.title;
-        document.getElementById("formAmount").value        = data.amount;
-        document.getElementById("formDate").value          = data.expense_date;
-        document.getElementById("formCategory").value      = data.category;
-        document.getElementById("formPaymentMethod").value = data.payment_method;
-        document.getElementById("formNotes").value         = data.notes || "";
+        document.getElementById("modalTitle").innerText         = "Edit Expense";
+        document.getElementById("expenseId").value              = data.id;
+        document.getElementById("formTitle").value              = data.title;
+        document.getElementById("formAmount").value             = data.amount;
+        document.getElementById("formDate").value               = data.expense_date;
+        document.getElementById("formCategory").value           = data.category;
+        document.getElementById("formPaymentMethod").value      = data.payment_method;
+        document.getElementById("formNotes").value              = data.notes || "";
         document.getElementById("expenseModal").classList.add("open");
     } catch (err) {
         showToast("Failed to load expense details", "error");
@@ -538,9 +728,9 @@ async function handleFormSubmit(event) {
         notes:          document.getElementById("formNotes").value.trim() || null
     };
 
-    const saveBtn = document.getElementById("saveButton");
-    saveBtn.disabled   = true;
-    saveBtn.innerText  = "Saving…";
+    const saveBtn     = document.getElementById("saveButton");
+    saveBtn.disabled  = true;
+    saveBtn.innerText = "Saving…";
 
     try {
         const res = await fetch(isEdit ? `/api/expenses/${id}` : "/api/expenses", {
@@ -555,7 +745,7 @@ async function handleFormSubmit(event) {
         }
 
         closeModal();
-        showToast(isEdit ? "Expense updated!" : "Expense added successfully!", "success");
+        showToast(isEdit ? "Expense updated!" : "Expense added!", "success");
         fetchExpenses();
         fetchSummaryStats();
     } catch (err) {
@@ -594,19 +784,13 @@ async function executeDelete() {
 }
 
 // =========================================================
-// Search & Utilities
+// CSV Export
 // =========================================================
-function debounceSearch() {
-    clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(fetchExpenses, 280);
-}
-
 function exportDataCSV() {
     if (allExpensesCache.length === 0) {
         showToast("No expenses to export", "error");
         return;
     }
-
     const headers = ["ID", "Title", "Amount", "Category", "Payment Method", "Date", "Notes"];
     const rows = allExpensesCache.map(e => [
         e.id,
@@ -615,34 +799,43 @@ function exportDataCSV() {
         `"${e.category}"`,
         `"${e.payment_method}"`,
         e.expense_date,
-        `"${(e.notes || '').replace(/"/g, '""')}"`
+        `"${(e.notes || "").replace(/"/g, '""')}"`
     ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csv  = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", encodeURI(csv));
     link.setAttribute("download", `CampusSpend_${new Date().toISOString().split("T")[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast("Exported CSV successfully!", "success");
+    showToast("Exported CSV!", "success");
 }
 
+// =========================================================
+// Search
+// =========================================================
+function debounceSearch() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(fetchExpenses, 280);
+}
+
+// =========================================================
+// Toast Notifications
+// =========================================================
 function showToast(message, type = "info") {
-    const area  = document.getElementById("toastArea");
+    const area = document.getElementById("toastArea");
     if (!area) return;
 
     const toast = document.createElement("div");
-    let cls = "toast-msg";
+    let cls  = "toast-msg";
     let icon = "";
 
     if (type === "success") {
         cls  = "toast-msg toast-success";
-        icon = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--accent-lime);flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5l-4.5-4.5 1.41-1.41L10 13.67l7.18-7.18 1.41 1.41L10 16.5z"/></svg>`;
+        icon = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5l-4.5-4.5 1.41-1.41L10 13.67l7.18-7.18 1.41 1.41L10 16.5z"/></svg>`;
     } else if (type === "error") {
         cls  = "toast-msg toast-error";
-        icon = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--danger);flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
+        icon = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
     }
 
     toast.className = cls;
@@ -655,6 +848,22 @@ function showToast(message, type = "info") {
         toast.style.transform  = "translateY(10px)";
         setTimeout(() => toast.remove(), 320);
     }, 3200);
+}
+
+// =========================================================
+// Utilities
+// =========================================================
+function fmt(val)    { return `Rs.${(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`; }
+function fmtInt(val) { return `Rs.${(val || 0).toLocaleString("en-IN")}`; }
+
+function setInner(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = val;
+}
+
+function setStyle(id, prop, val) {
+    const el = document.getElementById(id);
+    if (el) el.style[prop] = val;
 }
 
 function escapeHtml(text) {

@@ -1,11 +1,17 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusSpend — Modern Student Expense &amp; Budget Dashboard</title>
+    <title>CampusSpend — Student Expense &amp; Budget Dashboard</title>
+    <!-- Theme init runs before paint to prevent flash -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem("camp_theme") || "dark";
+            document.documentElement.setAttribute("data-theme", saved);
+        })();
+    </script>
     <link rel="stylesheet" href="/static/css/style.css">
-    <!-- Chart.js for Bento Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -20,7 +26,7 @@
                 <div class="brand">
                     <div class="brand-symbol">
                         <svg viewBox="0 0 24 24">
-                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                            <path d="M21 7H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1zm-9 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
                         </svg>
                     </div>
                     <span class="brand-name">SPEND</span>
@@ -28,45 +34,35 @@
 
                 <!-- Navigation Links -->
                 <nav class="nav-menu">
-                    <a href="#dashboard" class="nav-item active" onclick="switchView('dashboard', this)">
+                    <a href="#" class="nav-item active" onclick="switchView('dashboard', this); return false;">
                         <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
                         <span>Dashboard</span>
                     </a>
-                    <a href="#transactions" class="nav-item" onclick="switchView('transactions', this)">
+                    <a href="#" class="nav-item" onclick="switchView('transactions', this); return false;">
                         <svg class="nav-icon" viewBox="0 0 24 24"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
                         <span>Transactions</span>
                         <span class="nav-badge" id="navBadgeCount">0</span>
                     </a>
-                    <a href="#analytics" class="nav-item" onclick="switchView('dashboard', this)">
+                    <a href="#" class="nav-item" onclick="switchView('analytics', this); return false;">
                         <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
                         <span>Analytics</span>
                     </a>
-                    <a href="#budget" class="nav-item" onclick="switchView('dashboard', this)">
+                    <a href="#" class="nav-item" onclick="switchView('budget', this); return false;">
                         <svg class="nav-icon" viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
                         <span>Budget</span>
-                    </a>
-                    <a href="/docs" target="_blank" class="nav-item">
-                        <svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
-                        <span>REST API Spec</span>
-                        <span class="nav-badge-pill">Swagger</span>
                     </a>
                 </nav>
             </div>
 
-            <!-- Sidebar Bottom Promo Card & Collapse -->
+            <!-- Sidebar Bottom: Status + Collapse -->
             <div class="sidebar-bottom">
-                <div class="pro-card">
-                    <div class="pro-icon">
-                        <svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
-                    </div>
-                    <div class="pro-title">Cloud DB Active</div>
-                    <div class="pro-desc">Neon PostgreSQL &amp; Render PaaS cloud integration.</div>
-                    <a href="https://github.com/s-nsk-r/Campus-Spend" target="_blank" class="btn-pro">View GitHub</a>
+                <div class="db-status-card">
+                    <span class="live-dot"></span>
+                    <span class="db-status-text">Database Online</span>
                 </div>
-
                 <button class="btn-collapse" onclick="toggleSidebar()">
                     <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-                    <span>Collapse sidebar</span>
+                    <span>Collapse</span>
                 </button>
             </div>
         </aside>
@@ -77,9 +73,12 @@
             <!-- ===== Top Header ===== -->
             <header class="top-bar">
                 <!-- Search Box -->
-                <div class="search-bar">
+                <div class="search-bar" id="globalSearchBar">
                     <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-                    <input type="text" id="searchInput" oninput="debounceSearch()" placeholder="Quick search transactions, notes…">
+                    <input type="text" id="searchInput" oninput="handleGlobalSearch()" placeholder="Search transactions…" autocomplete="off">
+                    <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" title="Clear search">
+                        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </button>
                 </div>
 
                 <!-- Right Header Actions -->
@@ -89,22 +88,7 @@
                         <svg id="themeIcon" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
                     </button>
 
-                    <!-- Cloud Status Indicator -->
-                    <div class="cloud-status-capsule" title="Connected to Neon Serverless PostgreSQL">
-                        <span class="live-dot"></span>
-                        <span>Neon DB</span>
-                    </div>
-
-                    <!-- User Profile Capsule -->
-                    <div class="profile-capsule">
-                        <div class="profile-avatar">S</div>
-                        <div class="profile-info">
-                            <span class="profile-name">Student Account</span>
-                            <span class="profile-email">campus@student.edu</span>
-                        </div>
-                    </div>
-
-                    <!-- Primary Action Button -->
+                    <!-- Add Expense CTA -->
                     <button class="btn-primary-action" onclick="openAddModal()">
                         <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                         <span>Add Expense</span>
@@ -113,15 +97,15 @@
             </header>
 
             <!-- ===== Views Container ===== -->
-            <main class="content-container">
+            <main class="content-container" id="contentContainer">
 
-                <!-- ===== VIEW 1: ACRU-STYLE BENTO DASHBOARD ===== -->
-                <div id="dashboardView" class="dashboard-grid">
+                <!-- ===== VIEW 1: DASHBOARD ===== -->
+                <div id="dashboardView" class="view-panel dashboard-grid">
 
-                    <!-- ===== LEFT/CENTER WIDE COLUMN ===== -->
+                    <!-- LEFT / CENTER WIDE COLUMN -->
                     <div class="bento-main-col">
 
-                        <!-- 1. Hero Balance & Chart Card -->
+                        <!-- Hero Balance & Chart Card -->
                         <div class="card hero-card">
                             <div class="hero-left">
                                 <div class="hero-header">
@@ -130,15 +114,10 @@
                                         <div class="hero-subtitle">Total Monthly Spend</div>
                                     </div>
                                     <div class="hero-controls">
-                                        <div class="pill-select">
-                                            <span class="pill-active">7d</span>
-                                            <span>30d</span>
-                                            <span>All</span>
-                                        </div>
                                         <div class="legend-pills">
-                                            <span class="legend-item"><span class="dot dot-green"></span> Academics</span>
-                                            <span class="legend-item"><span class="dot dot-yellow"></span> Food</span>
-                                            <span class="legend-item"><span class="dot dot-coral"></span> Living</span>
+                                            <span class="legend-item"><span class="dot dot-green"></span>Academics</span>
+                                            <span class="legend-item"><span class="dot dot-yellow"></span>Food</span>
+                                            <span class="legend-item"><span class="dot dot-coral"></span>Living</span>
                                         </div>
                                     </div>
                                 </div>
@@ -149,7 +128,7 @@
 
                             <div class="hero-right-metrics">
                                 <div class="hero-stat-block">
-                                    <div class="hero-stat-label">Total Budget</div>
+                                    <div class="hero-stat-label">Monthly Budget</div>
                                     <div class="hero-stat-val" id="statMonthlyBudget">₹15,000</div>
                                     <div class="hero-trend trend-up">
                                         <svg viewBox="0 0 24 24"><path d="M7 14l5-5 5 5z"/></svg>
@@ -162,7 +141,7 @@
                                     <div class="hero-stat-val" id="statHeroExpenses">₹0.00</div>
                                     <div class="hero-trend trend-warn">
                                         <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
-                                        <span id="statExpenseTrend">Live cloud sync</span>
+                                        <span id="statExpenseTrend">Live sync</span>
                                     </div>
                                 </div>
 
@@ -177,36 +156,34 @@
                             </div>
                         </div>
 
-                        <!-- 2. Mid Row: Spending Limit & Tips Card -->
+                        <!-- Mid Row: Spending Limit & Tips -->
                         <div class="mid-cards-grid">
                             <!-- Monthly Spending Limit -->
                             <div class="card spending-limit-card">
                                 <div class="card-title-row">
                                     <span class="card-title">Monthly spending limit</span>
-                                    <button class="icon-tiny-btn" onclick="editBudgetLimit()" title="Change Budget Goal">
+                                    <button class="icon-tiny-btn" onclick="editBudgetLimit()" title="Change Budget">
                                         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                                     </button>
                                 </div>
-                                <div class="spending-sub">Target spending ceiling for the current month</div>
-                                
+                                <div class="spending-sub">Target ceiling for the current month</div>
                                 <div class="spending-bar-wrapper">
                                     <div class="spending-progress-bar">
                                         <div class="spending-fill" id="spendingProgressBar" style="width: 0%;"></div>
                                     </div>
                                 </div>
-                                
                                 <div class="spending-amounts-row">
                                     <span class="spent-text" id="spendingSpentLabel">₹0</span>
                                     <span class="limit-text" id="spendingLimitLabel">₹15,000</span>
                                 </div>
                             </div>
 
-                            <!-- Optimize Tips Card -->
+                            <!-- Tips Card -->
                             <div class="card tips-card">
                                 <div class="tips-content">
-                                    <div class="tips-title">Optimize your budget with these quick tips</div>
-                                    <div class="tips-body">Maintain student dining and subscription spends below 35% of total pocket allowance.</div>
-                                    <a href="#budget" onclick="switchView('transactions', this)" class="tips-link">
+                                    <div class="tips-title">Optimize your budget</div>
+                                    <div class="tips-body">Keep dining and subscriptions below 35% of your total allowance to maintain a healthy savings buffer.</div>
+                                    <a href="#" onclick="switchView('transactions', null); return false;" class="tips-link">
                                         <span>View records</span>
                                         <svg viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
                                     </a>
@@ -224,35 +201,27 @@
                             </div>
                         </div>
 
-                        <!-- 3. Bottom Row: Cost Analysis + Financial Health + Goal Tracker -->
+                        <!-- Bottom Row: Cost Analysis + Financial Health + Goals -->
                         <div class="bottom-cards-grid">
                             <!-- Cost Analysis -->
                             <div class="card sub-bento-card">
                                 <div class="card-title-row">
                                     <div>
                                         <span class="card-title">Cost analysis</span>
-                                        <div class="card-caption">Category spend breakdown</div>
+                                        <div class="card-caption">Category breakdown</div>
                                     </div>
                                     <div class="tiny-badge">This Month</div>
                                 </div>
                                 <div class="cost-big-amount" id="costAnalysisTotal">₹0.00</div>
-
-                                <!-- Horizontal Segmented Bar -->
                                 <div class="segmented-bar" id="costSegmentedBar">
-                                    <div class="seg-item seg-orange" style="width: 30%;"></div>
-                                    <div class="seg-item seg-blue" style="width: 25%;"></div>
-                                    <div class="seg-item seg-green" style="width: 20%;"></div>
-                                    <div class="seg-item seg-purple" style="width: 15%;"></div>
-                                    <div class="seg-item seg-gray" style="width: 10%;"></div>
+                                    <div class="seg-item seg-gray" style="width: 100%;"></div>
                                 </div>
-
-                                <!-- Category List -->
                                 <div class="category-breakdown-list" id="categoryBreakdownList">
                                     <div class="cat-list-empty">Add expenses to see cost distribution</div>
                                 </div>
                             </div>
 
-                            <!-- Financial Health Radial Gauge -->
+                            <!-- Financial Health Gauge -->
                             <div class="card sub-bento-card">
                                 <div class="card-title-row">
                                     <div>
@@ -262,8 +231,6 @@
                                     <div class="tiny-badge">Live</div>
                                 </div>
                                 <div class="health-score-val" id="healthScoreDisplay">Optimal</div>
-
-                                <!-- Half-Circle Radial Gauge -->
                                 <div class="radial-gauge-container">
                                     <svg class="radial-svg" viewBox="0 0 120 70">
                                         <path class="gauge-bg" d="M 15 65 A 45 45 0 0 1 105 65" fill="none" stroke-width="12" stroke-linecap="round"/>
@@ -274,55 +241,61 @@
                                         <span class="gauge-label">Budget intact</span>
                                     </div>
                                 </div>
-                                <div class="gauge-footer-note">Based on your remaining monthly budget pool</div>
+                                <div class="gauge-footer-note">Based on your remaining monthly budget</div>
                             </div>
 
-                            <!-- Goal Tracker -->
+                            <!-- Campus Goals -->
                             <div class="card sub-bento-card">
                                 <div class="card-title-row">
                                     <div>
                                         <span class="card-title">Campus goals</span>
                                         <div class="card-caption">Budget targets</div>
                                     </div>
-                                    <button class="icon-tiny-btn" onclick="openAddModal()" title="Add Expense">+ Add</button>
+                                    <button class="icon-tiny-btn" onclick="openAddModal()">+ Add</button>
                                 </div>
 
                                 <div class="goals-list">
                                     <div class="goal-item">
-                                        <div class="goal-icon-box goal-lime">📚</div>
+                                        <div class="goal-icon-box goal-lime">
+                                            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--accent-lime-dark);"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 4h2v5l-1-.75L9 9V4zm9 16H6V4h1v9l3-2.25L13 13V4h5v16z"/></svg>
+                                        </div>
                                         <div class="goal-info">
                                             <div class="goal-name-row">
                                                 <span class="goal-name">Academics</span>
                                                 <span class="goal-amount" id="goalAcademicAmount">₹0 / ₹4,000</span>
                                             </div>
                                             <div class="goal-prog-bar">
-                                                <div class="goal-prog-fill fill-lime" id="goalAcademicProg" style="width: 15%;"></div>
+                                                <div class="goal-prog-fill fill-lime" id="goalAcademicProg" style="width: 0%;"></div>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="goal-item">
-                                        <div class="goal-icon-box goal-orange">🍔</div>
+                                        <div class="goal-icon-box goal-orange">
+                                            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--color-orange);"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>
+                                        </div>
                                         <div class="goal-info">
                                             <div class="goal-name-row">
                                                 <span class="goal-name">Food &amp; Mess</span>
                                                 <span class="goal-amount" id="goalFoodAmount">₹0 / ₹5,000</span>
                                             </div>
                                             <div class="goal-prog-bar">
-                                                <div class="goal-prog-fill fill-orange" id="goalFoodProg" style="width: 25%;"></div>
+                                                <div class="goal-prog-fill fill-orange" id="goalFoodProg" style="width: 0%;"></div>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div class="goal-item">
-                                        <div class="goal-icon-box goal-cyan">🚌</div>
+                                        <div class="goal-icon-box goal-cyan">
+                                            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:var(--color-cyan);"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5S15.67 14 16.5 14s1.5.67 1.5 1.5S17.33 17 16.5 17zM12 4c3.82 0 6.45.45 7 1.5V11H5V5.5C5.55 4.45 8.18 4 12 4z"/></svg>
+                                        </div>
                                         <div class="goal-info">
                                             <div class="goal-name-row">
                                                 <span class="goal-name">Transport</span>
                                                 <span class="goal-amount" id="goalTransportAmount">₹0 / ₹2,000</span>
                                             </div>
                                             <div class="goal-prog-bar">
-                                                <div class="goal-prog-fill fill-cyan" id="goalTransportProg" style="width: 10%;"></div>
+                                                <div class="goal-prog-fill fill-cyan" id="goalTransportProg" style="width: 0%;"></div>
                                             </div>
                                         </div>
                                     </div>
@@ -332,103 +305,38 @@
 
                     </div>
 
-                    <!-- ===== RIGHT COLUMN: VIRTUAL CARD & RECENT TRANSACTIONS ===== -->
+                    <!-- RIGHT COLUMN: Recent Transactions Only -->
                     <div class="bento-side-col">
-
-                        <!-- 1. My Card Component -->
-                        <div class="card card-widget">
-                            <div class="card-title-row">
-                                <div>
-                                    <span class="card-title">My card</span>
-                                    <div class="card-caption">Campus virtual debit pass</div>
-                                </div>
-                                <span class="badge-mini-active">Active</span>
-                            </div>
-
-                            <!-- Virtual Debit Card Mockup -->
-                            <div class="virtual-card-wrapper">
-                                <div class="virtual-card-back"></div>
-                                <div class="virtual-card">
-                                    <div class="vc-top">
-                                        <div class="vc-badge">Campus Pass</div>
-                                        <div class="vc-network">VISA</div>
-                                    </div>
-                                    <div class="vc-chip-row">
-                                        <div class="vc-chip"></div>
-                                        <svg class="vc-contactless" viewBox="0 0 24 24"><path d="M12 4C7.58 4 4 7.58 4 12c0 2.22.9 4.23 2.36 5.67l1.42-1.42C6.6 15.08 6 13.62 6 12c0-3.31 2.69-6 6-6s6 2.69 6 6c0 1.62-.6 3.08-1.78 4.25l1.42 1.42C20.1 16.23 21 14.22 21 12c0-4.42-3.58-8-9-8zm0 4c-2.21 0-4 1.79-4 4 0 1.11.45 2.12 1.18 2.84l1.42-1.42C10.22 13.06 10 12.56 10 12c0-1.1.9-2 2-2s2 .9 2 2c0 .56-.22 1.06-.6 1.42l1.42 1.42c.73-.72 1.18-1.73 1.18-2.84 0-2.21-1.79-4-4-4z"/></svg>
-                                    </div>
-                                    <div class="vc-number">•••• •••• •••• 7890</div>
-                                    <div class="vc-bottom">
-                                        <div class="vc-holder">
-                                            <span class="vc-label">CARD HOLDER</span>
-                                            <span class="vc-name">STUDENT USER</span>
-                                        </div>
-                                        <div class="vc-expiry">
-                                            <span class="vc-label">EXPIRES</span>
-                                            <span class="vc-date">03/30</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Quick Action Circular Buttons -->
-                            <div class="card-quick-actions">
-                                <button class="action-btn" onclick="openAddModal()">
-                                    <div class="action-circle">
-                                        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                                    </div>
-                                    <span>Add</span>
-                                </button>
-                                <button class="action-btn" onclick="switchView('transactions', this)">
-                                    <div class="action-circle">
-                                        <svg viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
-                                    </div>
-                                    <span>Filter</span>
-                                </button>
-                                <button class="action-btn" onclick="exportDataCSV()">
-                                    <div class="action-circle">
-                                        <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-                                    </div>
-                                    <span>Export</span>
-                                </button>
-                                <button class="action-btn" onclick="switchView('transactions', this)">
-                                    <div class="action-circle">
-                                        <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-                                    </div>
-                                    <span>History</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- 2. Recent Transactions List -->
+                        <!-- Recent Transactions Stream -->
                         <div class="card card-widget transactions-widget">
                             <div class="card-title-row">
                                 <div>
-                                    <span class="card-title">Transaction history</span>
+                                    <span class="card-title">Recent transactions</span>
                                     <div class="card-caption">Latest campus spends</div>
                                 </div>
-                                <button class="btn-text-action" onclick="switchView('transactions', this)">View all</button>
+                                <button class="btn-text-action" onclick="switchView('transactions', null)">View all</button>
                             </div>
-
-                            <!-- Stream Container -->
                             <div class="recent-stream" id="recentTransactionsStream">
-                                <div class="stream-empty">Loading transactions…</div>
+                                <div class="stream-empty">Loading…</div>
                             </div>
                         </div>
-
                     </div>
 
                 </div>
 
-                <!-- ===== VIEW 2: FULL TRANSACTIONS TABLE VIEW ===== -->
-                <div id="transactionsView" class="transactions-full-view" style="display: none;">
+                <!-- ===== VIEW 2: FULL TRANSACTIONS TABLE ===== -->
+                <div id="transactionsView" class="view-panel transactions-full-view" style="display: none;">
                     <div class="card">
                         <div class="table-header-row">
                             <div>
-                                <div class="card-title" style="font-size: 1.25rem;">Complete Expense Records</div>
-                                <div class="card-caption">Filter, inspect, and manage all your stored expenses</div>
+                                <div class="card-title" style="font-size: 1.2rem;">Expense Records</div>
+                                <div class="card-caption">Filter, inspect, and manage all stored expenses</div>
                             </div>
                             <div class="table-actions">
+                                <button onclick="exportDataCSV()" class="btn-export">
+                                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                                    Export CSV
+                                </button>
                                 <button onclick="openAddModal()" class="btn-primary-action">
                                     <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                                     <span>Add Expense</span>
@@ -436,9 +344,10 @@
                             </div>
                         </div>
 
-                        <!-- Filters Row -->
+                        <!-- Filters -->
                         <div class="filters-row">
                             <div class="filter-input-wrap">
+                                <svg class="filter-search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                                 <input type="text" id="tableSearchInput" oninput="debounceSearch()" placeholder="Search title or notes…" class="modern-input">
                             </div>
                             <div>
@@ -464,7 +373,7 @@
                             </div>
                         </div>
 
-                        <!-- Main Table -->
+                        <!-- Table -->
                         <div class="table-responsive">
                             <table class="modern-table">
                                 <thead>
@@ -485,6 +394,124 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== VIEW 3: ANALYTICS ===== -->
+                <div id="analyticsView" class="view-panel" style="display: none;">
+                    <div class="analytics-header">
+                        <div class="card-title" style="font-size:1.2rem;">Spending Analytics</div>
+                        <div class="card-caption">Visual breakdown of your campus expenses</div>
+                    </div>
+                    <div class="analytics-grid-layout">
+                        <!-- Doughnut Chart -->
+                        <div class="card">
+                            <div class="card-title-row">
+                                <div>
+                                    <span class="card-title">Category distribution</span>
+                                    <div class="card-caption">Share of total spending by category</div>
+                                </div>
+                            </div>
+                            <div class="analytics-chart-box">
+                                <canvas id="analyticsDonutChart"></canvas>
+                                <div id="analyticsDonutPlaceholder" class="chart-placeholder-msg">Add expenses to see your spending distribution</div>
+                            </div>
+                        </div>
+
+                        <!-- Summary Stats Panel -->
+                        <div class="card">
+                            <div class="card-title-row">
+                                <div>
+                                    <span class="card-title">Spending summary</span>
+                                    <div class="card-caption">Key metrics across all records</div>
+                                </div>
+                            </div>
+                            <div class="analytics-stats-list" id="analyticsStatsList">
+                                <div class="analytics-stat-row">
+                                    <span class="analytics-stat-label">Total Spent</span>
+                                    <span class="analytics-stat-val" id="anTotalSpent">₹0.00</span>
+                                </div>
+                                <div class="analytics-stat-row">
+                                    <span class="analytics-stat-label">Total Records</span>
+                                    <span class="analytics-stat-val" id="anTotalCount">0</span>
+                                </div>
+                                <div class="analytics-stat-row">
+                                    <span class="analytics-stat-label">Highest Expense</span>
+                                    <span class="analytics-stat-val" id="anHighest">₹0.00</span>
+                                </div>
+                                <div class="analytics-stat-row">
+                                    <span class="analytics-stat-label">Average Expense</span>
+                                    <span class="analytics-stat-val" id="anAverage">₹0.00</span>
+                                </div>
+                                <div class="analytics-stat-row">
+                                    <span class="analytics-stat-label">Top Category</span>
+                                    <span class="analytics-stat-val" id="anTopCat">—</span>
+                                </div>
+                            </div>
+                            <!-- Payment Method Breakdown -->
+                            <div style="margin-top:1.5rem;">
+                                <div class="card-caption" style="margin-bottom:0.75rem;font-weight:600;">By payment method</div>
+                                <div id="analyticsPaymentList" class="category-breakdown-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== VIEW 4: BUDGET ===== -->
+                <div id="budgetView" class="view-panel" style="display: none;">
+                    <div class="analytics-header">
+                        <div class="card-title" style="font-size:1.2rem;">Budget Management</div>
+                        <div class="card-caption">Track spending against your monthly targets</div>
+                    </div>
+                    <div class="budget-grid-layout">
+                        <!-- Overall Budget Card -->
+                        <div class="card budget-overview-card">
+                            <div class="card-title-row">
+                                <div>
+                                    <span class="card-title">Monthly budget overview</span>
+                                    <div class="card-caption">Overall spend vs. limit</div>
+                                </div>
+                                <button class="icon-tiny-btn" onclick="editBudgetLimit()">
+                                    <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                                    Edit limit
+                                </button>
+                            </div>
+                            <div class="budget-big-amounts">
+                                <div>
+                                    <div class="budget-amount-label">Spent</div>
+                                    <div class="budget-amount-val" id="budgetSpentVal">₹0</div>
+                                </div>
+                                <div class="budget-divider">/</div>
+                                <div>
+                                    <div class="budget-amount-label">Limit</div>
+                                    <div class="budget-amount-val muted" id="budgetLimitVal">₹15,000</div>
+                                </div>
+                                <div>
+                                    <div class="budget-amount-label">Remaining</div>
+                                    <div class="budget-amount-val accent" id="budgetRemainingVal">₹15,000</div>
+                                </div>
+                            </div>
+                            <div class="spending-progress-bar" style="height:20px;margin-top:1rem;">
+                                <div class="spending-fill" id="budgetProgressBarMain" style="width:0%;"></div>
+                            </div>
+                            <div class="spending-amounts-row" style="margin-top:0.5rem;">
+                                <span class="spent-text" id="budgetPctLabel">0% used</span>
+                                <span class="limit-text" id="budgetRemainingLabel">₹15,000 remaining</span>
+                            </div>
+                        </div>
+
+                        <!-- Category Budget Breakdown -->
+                        <div class="card">
+                            <div class="card-title-row">
+                                <div>
+                                    <span class="card-title">Category budgets</span>
+                                    <div class="card-caption">Spending per category vs. suggested limits</div>
+                                </div>
+                            </div>
+                            <div class="budget-cat-list" id="budgetCategoryList">
+                                <div class="cat-list-empty">Add expenses to see category breakdown</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -511,7 +538,7 @@
 
                     <div class="form-grid-2">
                         <div>
-                            <label class="field-label">Amount (₹) *</label>
+                            <label class="field-label">Amount (Rs.) *</label>
                             <input type="number" step="0.01" min="0.01" id="formAmount" required placeholder="150.00" class="modern-input">
                         </div>
                         <div>
@@ -566,7 +593,7 @@
                 </div>
                 <div class="modal-title" style="margin-bottom: 0.5rem;">Delete Expense?</div>
                 <div style="font-size: 0.85rem; color: var(--text-sub); line-height: 1.5;">
-                    This will permanently delete <strong id="deleteItemTitle" style="color: var(--danger);">this expense</strong> from your cloud database.
+                    This will permanently delete <strong id="deleteItemTitle" style="color: var(--danger);">this expense</strong>. This action cannot be undone.
                 </div>
             </div>
             <div class="modal-bottom" style="justify-content: center; border-top: none; padding-bottom: 1.8rem;">
@@ -582,12 +609,5 @@
     <!-- Application Controller -->
     <script src="/static/js/app.js"></script>
 
-    <!-- Initial Theme Detection -->
-    <script>
-        (function() {
-            const saved = localStorage.getItem("camp_theme") || "light";
-            document.documentElement.setAttribute("data-theme", saved);
-        })();
-    </script>
 </body>
 </html>
