@@ -2,7 +2,7 @@
 
 > **BACSE344 — Cloud Infrastructure and Architecture (Digital Assignment)**  
 > **Faculty:** Dr. P. Anandan | **Slot:** C1  
-> **Author:** Sanskar (`s-nsk-r`) | **Course:** B.Tech CSE  
+> **Author:** Sanskar (`s-nsk-r`) | **Registration No:** 25BCE5808 | **Course:** B.Tech CSE  
 > **Live Web Application:** [https://campus-spend-cloud.onrender.com](https://campus-spend-cloud.onrender.com) *(or your deployed Render URL)*  
 > **Interactive Swagger API Docs:** [https://campus-spend-cloud.onrender.com/docs](https://campus-spend-cloud.onrender.com/docs)  
 > **Alternative ReDoc API Docs:** [https://campus-spend-cloud.onrender.com/redoc](https://campus-spend-cloud.onrender.com/redoc)
@@ -14,18 +14,6 @@
 **CampusSpend** is a production-grade, cloud-native expense management and budgeting platform designed specifically for university students. Engineered using a decoupled **3-Tier Cloud Architecture**, the application provides real-time financial tracking, multi-category budgeting, and visual spending analytics through a sleek, ACRU-inspired fintech bento-grid dashboard.
 
 Deployed on **Render.com** (Cloud PaaS) with a managed **Neon.tech PostgreSQL** (Cloud DBaaS) backend, CampusSpend delivers automatic SSL termination, CI/CD pipeline automation, and connection pooling for scalable, low-latency performance.
-
----
-
-## 🎯 Evaluation Rubric Compliance (10 / 10 Marks)
-
-| Component | Marks | Implementation & Architectural Evidence | Status |
-| :--- | :---: | :--- | :---: |
-| **1. Problem Selection & System Architecture** | **1** | Real-world student budgeting problem; decoupled 3-Tier Cloud Architecture separating Client (SPA), PaaS Compute (FastAPI on Render), and DBaaS Storage (Neon PostgreSQL). | **1/1** |
-| **2. Application Development** | **3** | Full RESTful CRUD operations; dynamic category budget limits; real-time health gauge; search & category filter queries; level segmented cost analysis bar; and daily stacked bar chart with 1px hairline dividers. | **3/3** |
-| **3. Database & REST API Integration** | **2** | Cloud-hosted PostgreSQL with SQLAlchemy 2.0 ORM; Pydantic v2 data validation schemas; connection pooling (`pool_pre_ping`); and offline resilience fallback. | **2/2** |
-| **4. Cloud Deployment & Integration** | **2** | Automated continuous deployment via GitHub to Render.com; environment variable management (`DATABASE_URL`, `PYTHON_VERSION`); HTTPS/SSL encryption; and zero-downtime rolling updates. | **2/2** |
-| **5. Documentation & Demonstration** | **2** | Comprehensive documentation suite in `/docs`: System Architecture, ER Database Design, OpenAPI Specification, Deployment Guide, and Video Presentation Script. | **2/2** |
 
 ---
 
@@ -208,4 +196,4 @@ All supplementary submission documents are available in the [`/docs`](./docs) di
 ## 📄 License & Attribution
 
 Developed for **BACSE344 — Cloud Infrastructure and Architecture**, 2026.  
-Author: **Sanskar** (`s-nsk-r`)
+Author: **Sanskar** (`s-nsk-r`) | **Registration No:** 25BCE5808
