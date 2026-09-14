@@ -121,11 +121,3 @@ The test suite covers all CRUD operations, analytics endpoints, and UI rendering
 The app is deployed as a Web Service on **Render.com**, connected to a **Neon.tech** PostgreSQL database. The `DATABASE_URL` is stored as a secure environment variable in Render — no credentials are committed to the repository.
 
 Every push to the `main` branch triggers an automatic redeploy via Render's built-in CI/CD pipeline.
-
----
-
-## Academic Context
-
-This project was developed as a Digital Assignment for **BACSE344 — Cloud Infrastructure and Architecture** at VIT Vellore, under the guidance of Dr. P. Anandan.
-
-**Author:** Sanskar &nbsp;|&nbsp; Reg. No. 25BCE5808
