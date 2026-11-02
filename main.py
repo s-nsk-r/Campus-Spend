@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, Query, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,6 +14,10 @@ from sqlalchemy import desc, func
 from database import engine, Base, get_db
 import models
 import schemas
+import auth
+
+# Unique backend identifier for load balancer demonstration (DA3 - Q1a)
+INSTANCE_ID = os.getenv("INSTANCE_ID", "backend-1")
 
 # Create database tables automatically upon startup
 Base.metadata.create_all(bind=engine)
@@ -41,6 +45,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Custom Middleware to stamp every HTTP response with the serving backend instance
+@app.middleware("http")
+async def add_load_balancer_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Backend-Instance"] = INSTANCE_ID
+    response.headers["X-Served-By"] = f"CampusSpend-{INSTANCE_ID}"
+    return response
+
 # Ensure directories exist
 os.makedirs("static/css", exist_ok=True)
 os.makedirs("static/js", exist_ok=True)
@@ -60,15 +72,17 @@ async def home_dashboard(request: Request):
 
 
 # ==========================================
-# Health Check Route (For Cloud PaaS Load Balancers)
+# Health Check Route (For Cloud PaaS & Nginx Load Balancers)
 # ==========================================
 @app.get("/health", tags=["System Health"], summary="Cloud Health Probe")
-def health_check():
-    """Endpoint for Render / Cloud load balancers to verify service availability."""
+def health_check(request: Request = None):
+    """Endpoint for Render / Nginx load balancers to verify service availability and node identity."""
+    node_id = getattr(request.state, "instance_id", INSTANCE_ID) if request else INSTANCE_ID
     return {
         "status": "healthy",
         "service": "CampusSpend REST API",
-        "environment": "Cloud / PaaS",
+        "instance_id": node_id,
+        "environment": "Clustered behind Nginx",
         "timestamp": datetime.utcnow().isoformat()
     }
 
@@ -167,7 +181,8 @@ def get_expense(expense_id: int, db: Session = Depends(get_db)):
 def update_expense(
     expense_id: int,
     expense_update: schemas.ExpenseUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.require_role("admin"))
 ):
     """
     **Update Expense (U in CRUD)**
@@ -196,7 +211,11 @@ def update_expense(
     tags=["Expenses CRUD"],
     summary="Delete an expense by ID"
 )
-def delete_expense(expense_id: int, db: Session = Depends(get_db)):
+def delete_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.require_role("admin"))
+):
     """
     **Delete Expense (D in CRUD)**
     Permanently deletes an expense from the cloud database.
@@ -214,7 +233,7 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# Aggregate KPI Summary Analytics Endpoint
+# Aggregate KPI Summary Analytics Endpoint (Peak-Demand API - Q1)
 # ==========================================
 @app.get(
     "/api/summary/stats",
@@ -222,7 +241,7 @@ def delete_expense(expense_id: int, db: Session = Depends(get_db)):
     tags=["Analytics & Reporting"],
     summary="Get aggregated statistics and spending breakdown"
 )
-def get_expense_stats(db: Session = Depends(get_db)):
+def get_expense_stats(request: Request = None, db: Session = Depends(get_db)):
     """
     Computes real-time analytical metrics:
     - Total money spent
@@ -230,7 +249,9 @@ def get_expense_stats(db: Session = Depends(get_db)):
     - Highest single expense
     - Category-wise spending breakdown
     - Payment-method distribution
+    - Serving backend instance ID (for load balancer verification)
     """
+    node_id = getattr(request.state, "instance_id", INSTANCE_ID) if request else INSTANCE_ID
     expenses = db.query(models.Expense).all()
 
     total_spent = sum(e.amount for e in expenses)
@@ -258,7 +279,8 @@ def get_expense_stats(db: Session = Depends(get_db)):
         "highest_expense": round(highest_expense, 2),
         "category_breakdown": {k: round(v, 2) for k, v in category_breakdown.items()},
         "payment_method_breakdown": {k: round(v, 2) for k, v in payment_breakdown.items()},
-        "monthly_budget_limit": round(budget.monthly_limit, 2)
+        "monthly_budget_limit": round(budget.monthly_limit, 2),
+        "server_instance": node_id
     }
 
 
@@ -290,7 +312,8 @@ def get_budget_limit(db: Session = Depends(get_db)):
 )
 def update_budget_limit(
     budget_in: schemas.BudgetConfigUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.require_role("admin"))
 ):
     """Updates the cloud-synchronized monthly spending limit ceiling."""
     budget = db.query(models.BudgetConfig).filter(models.BudgetConfig.id == 1).first()
@@ -302,6 +325,117 @@ def update_budget_limit(
     db.commit()
     db.refresh(budget)
     return {"monthly_limit": budget.monthly_limit}
+
+
+# ==========================================
+# Authentication & Multi-Factor Auth (TOTP) Endpoints (DA3 - Q2b)
+# ==========================================
+@app.post(
+    "/api/auth/login",
+    response_model=schemas.LoginResponse,
+    tags=["Authentication & Security"],
+    summary="User Login with bcrypt password check and TOTP MFA verification"
+)
+def login(
+    login_in: schemas.LoginRequest,
+    db: Session = Depends(get_db)
+):
+    import bcrypt
+    user = db.query(models.User).filter(models.User.username == login_in.username).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials: username not found."
+        )
+
+    # Check password hash
+    pw_matches = False
+    try:
+        pw_matches = bcrypt.checkpw(login_in.password.encode("utf-8"), user.password_hash.encode("utf-8"))
+    except Exception:
+        pw_matches = (login_in.password == user.password_hash)
+
+    if not pw_matches:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials: password incorrect."
+        )
+
+    # If MFA is enabled, verify TOTP code
+    if user.is_mfa_enabled:
+        if not login_in.totp_code:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="MFA Required: Please provide 6-digit TOTP code from your authenticator app."
+            )
+        if not auth.verify_totp_code(user.totp_secret, login_in.totp_code):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="MFA Verification Failed: Invalid or expired 6-digit TOTP code."
+            )
+
+    token = auth.create_access_token(user.username, user.role)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "username": user.username,
+        "role": user.role,
+        "mfa_required": user.is_mfa_enabled
+    }
+
+
+@app.post(
+    "/api/auth/mfa/setup",
+    response_model=schemas.MFASetupResponse,
+    tags=["Authentication & Security"],
+    summary="Setup TOTP MFA for Google Authenticator / Microsoft Authenticator"
+)
+def setup_mfa(
+    username: str = Query(..., description="Username to configure TOTP for"),
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User '{username}' not found.")
+
+    secret = auth.generate_totp_secret()
+    user.totp_secret = secret
+    db.commit()
+
+    uri = auth.get_totp_provisioning_uri(username, secret)
+    return {
+        "username": username,
+        "secret": secret,
+        "provisioning_uri": uri,
+        "message": "Scan provisioning URI or enter secret key into Google/Microsoft Authenticator"
+    }
+
+
+@app.post(
+    "/api/auth/mfa/enable",
+    tags=["Authentication & Security"],
+    summary="Confirm 6-digit OTP code to activate MFA on user account"
+)
+def enable_mfa(
+    verify_in: schemas.MFAVerifyRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(models.User.username == verify_in.username).first()
+    if not user or not user.totp_secret:
+        raise HTTPException(status_code=400, detail="MFA setup has not been initiated for this user.")
+
+    if not auth.verify_totp_code(user.totp_secret, verify_in.totp_code):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Verification failed: Invalid or expired 6-digit TOTP code."
+        )
+
+    user.is_mfa_enabled = True
+    db.commit()
+    return {
+        "status": "success",
+        "message": f"MFA successfully enabled for user '{user.username}'. Google Authenticator active."
+    }
 
 
 # ==========================================

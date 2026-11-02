@@ -1,0 +1,19 @@
+# BEFORE HARDENING: Heavy base image, running as root (UID 0), build tools in runtime
+FROM python:3.13
+
+WORKDIR /app
+
+# Install development and build tools left in production container
+RUN apt-get update && apt-get install -y gcc libpq-dev make git
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . /app
+
+# VULNERABILITY 1: Runs as root (UID 0) - allows container breakout & host privilege escalation
+# VULNERABILITY 2: Heavyweight base image (1.05 GB) containing build-essential, git, curl
+# MISCONFIGURATION: Missing HEALTHCHECK instruction
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

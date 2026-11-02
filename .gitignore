@@ -5,4 +5,17 @@ __pycache__/
 .env
 .DS_Store
 .vscode/
+
+# Build and binary artifacts
 *.docx
+*.pdf
+*.msi
+hey.exe
+*.mp4
+
+# Local generators and scratch scripts
+generate_da3_docx.py
+generate_docx.py
+read_da3.py
+test_neon.py
+PRESENTATION_SCRIPT.md

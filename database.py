@@ -24,14 +24,16 @@ else:
         engine = create_engine(
             DATABASE_URL,
             pool_pre_ping=True,
-            pool_size=10,
-            max_overflow=20,
-            connect_args={"connect_timeout": 3}
+            pool_size=25,
+            max_overflow=35,
+            pool_timeout=30,
+            connect_args={"connect_timeout": 5}
         )
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
+        print("[Database] ✓ Successfully connected to Neon Cloud PostgreSQL Database!")
     except Exception as e:
-        logging.warning(f"Cloud DB unreachable ({e}). Using local SQLite fallback for development.")
+        print(f"[Database] Cloud DB unreachable ({e}). Using local SQLite fallback for development.")
         DATABASE_URL = "sqlite:///./campus_spend.db"
         engine = create_engine(
             DATABASE_URL,

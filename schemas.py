@@ -43,6 +43,7 @@ class ExpenseSummary(BaseModel):
     category_breakdown: Dict[str, float]
     payment_method_breakdown: Dict[str, float]
     monthly_budget_limit: Optional[float] = 15000.00
+    server_instance: Optional[str] = None
 
 
 class BudgetConfigUpdate(BaseModel):
@@ -51,3 +52,32 @@ class BudgetConfigUpdate(BaseModel):
 
 class BudgetConfigResponse(BaseModel):
     monthly_limit: float
+
+    class Config:
+        from_attributes = True
+
+
+# ==========================================
+# Authentication & MFA Schemas (DA3 - Q2b)
+# ==========================================
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+    totp_code: Optional[str] = None
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    username: str
+    role: str
+    mfa_required: bool = False
+
+class MFASetupResponse(BaseModel):
+    username: str
+    secret: str
+    provisioning_uri: str
+    message: str
+
+class MFAVerifyRequest(BaseModel):
+    username: str
+    totp_code: str
